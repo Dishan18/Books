@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -358,7 +360,8 @@ private fun YearInBooksCard(year: Int, onOpen: () -> Unit) {
 
 @Composable
 private fun StatsRow(state: ProgressState) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    // One height for all four tiles, so a label that wraps doesn't make its tile taller.
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Stat("⏱️", formatHours(state.totalSeconds), "read", Modifier.weight(1f))
         Stat("📚", "${state.booksThisYear}", "books this year", Modifier.weight(1f))
         Stat("📑", "${state.chaptersRead}", "chapters", Modifier.weight(1f))
@@ -369,7 +372,7 @@ private fun StatsRow(state: ProgressState) {
 @Composable
 private fun Stat(emoji: String, value: String, label: String, modifier: Modifier) {
     Column(
-        modifier.clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(vertical = 14.dp, horizontal = 6.dp),
+        modifier.fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(vertical = 14.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(emoji, fontSize = 20.sp)
@@ -391,31 +394,34 @@ private fun BadgesSection(state: ProgressState) {
     Column {
         Text("Badges · ${earned.size} of ${BadgeCatalog.all.size}", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(10.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Four equal columns across the full width; a short last row sits in the middle.
+        FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = 4, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             BadgeCatalog.all.forEach { badge ->
                 val got = badge.id in earned
                 val secret = badge.hidden && !got
-                Column(
-                    Modifier.width(76.dp).clip(RoundedCornerShape(16.dp)).clickable { selected = badge.id }.padding(vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(if (got) FlameGold.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center,
+                Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+                    Column(
+                        Modifier.width(76.dp).clip(RoundedCornerShape(16.dp)).clickable { selected = badge.id }.padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(if (secret) "?" else badge.emoji, fontSize = 26.sp, modifier = Modifier.alpha(if (got) 1f else 0.35f))
+                        Box(
+                            Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(if (got) FlameGold.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(if (secret) "?" else badge.emoji, fontSize = 26.sp, modifier = Modifier.alpha(if (got) 1f else 0.35f))
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (secret) "Secret" else badge.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            color = if (got) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (secret) "Secret" else badge.title,
-                        style = MaterialTheme.typography.labelSmall,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        color = if (got) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
