@@ -48,3 +48,7 @@ app/src/main/java/io/github/dishan18/books/
 ├── reader/                  PDF reader (Compose + PdfRenderer), EPUB reader (Readium), shared chrome
 └── ui/                      Theme and cover rendering
 ```
+
+## License
+
+Books is released under the [MIT License](LICENSE). The Readium toolkit it uses is under the BSD 3-Clause license.
