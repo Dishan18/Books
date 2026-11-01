@@ -13,7 +13,6 @@ import androidx.core.app.ActivityOptionsCompat
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.dishan18.books.data.Book
-import io.github.dishan18.books.library.LibraryScreen
 import io.github.dishan18.books.library.LibraryViewModel
 import io.github.dishan18.books.reader.readerIntent
 import io.github.dishan18.books.ui.theme.BooksTheme
@@ -29,7 +28,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             BooksTheme {
-                LibraryScreen(viewModel, onOpen = ::openBook)
+                AppRoot(viewModel, onOpenBook = ::openBook)
             }
         }
         if (savedInstanceState == null) importFrom(intent)

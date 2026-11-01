@@ -8,6 +8,14 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import io.github.dishan18.books.manga.data.DownloadDao
+import io.github.dishan18.books.manga.data.MangaChapter
+import io.github.dishan18.books.manga.data.MangaDao
+import io.github.dishan18.books.manga.data.MangaDownload
+import io.github.dishan18.books.manga.data.MangaHistory
+import io.github.dishan18.books.manga.data.MangaSeries
+import io.github.dishan18.books.manga.data.SourceConfigDao
+import io.github.dishan18.books.manga.data.SourceConfigEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -43,13 +51,30 @@ interface BookmarkDao {
     suspend fun delete(bookmark: Bookmark)
 }
 
-@Database(entities = [Book::class, Bookmark::class], version = 1, exportSchema = false)
+@Database(
+    entities = [
+        Book::class,
+        Bookmark::class,
+        SourceConfigEntity::class,
+        MangaSeries::class,
+        MangaChapter::class,
+        MangaHistory::class,
+        MangaDownload::class,
+    ],
+    version = 2,
+    exportSchema = true,
+)
 abstract class BooksDatabase : RoomDatabase() {
     abstract fun books(): BookDao
     abstract fun bookmarks(): BookmarkDao
+    abstract fun sources(): SourceConfigDao
+    abstract fun manga(): MangaDao
+    abstract fun downloads(): DownloadDao
 
     companion object {
         fun create(context: Context): BooksDatabase =
-            Room.databaseBuilder(context, BooksDatabase::class.java, "books.db").build()
+            Room.databaseBuilder(context, BooksDatabase::class.java, "books.db")
+                .addMigrations(*ALL_MIGRATIONS)
+                .build()
     }
 }

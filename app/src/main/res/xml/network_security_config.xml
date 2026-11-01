@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MangaDex and other public sources use HTTPS. Plain HTTP is allowed only so a Komga server on
+    your home network (e.g. http://192.168.1.20:25600) works; the app warns before saving a
+    non-HTTPS address that isn't on a local network.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

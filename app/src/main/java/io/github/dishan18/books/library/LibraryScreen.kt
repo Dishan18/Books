@@ -81,15 +81,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.dishan18.books.data.Book
 import io.github.dishan18.books.ui.BookCover
+import io.github.dishan18.books.ui.PressableBox
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val BookMimeTypes = arrayOf("application/pdf", "application/epub+zip")
-
-/** Holds a tile's on-screen bounds without triggering recomposition when they change. */
-private class BoundsHolder {
-    var rect = Rect.Zero
-}
 
 @Composable
 fun LibraryScreen(viewModel: LibraryViewModel, onOpen: (Book, Rect) -> Unit) {
@@ -224,47 +220,6 @@ private fun LibraryGrid(
                 modifier = Modifier.animateItem(),
             )
         }
-    }
-}
-
-/** Makes [content] shrink slightly under the finger and spring back, like iOS. */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun PressableBox(
-    onClick: (Rect) -> Unit,
-    onLongClick: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-    content: @Composable (Modifier) -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.95f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
-        label = "press",
-    )
-    val haptic = LocalHapticFeedback.current
-    val bounds = remember { BoundsHolder() }
-    Box(
-        modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .onGloballyPositioned { bounds.rect = it.boundsInWindow() }
-            .combinedClickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = { onClick(bounds.rect) },
-                onLongClick = onLongClick?.let {
-                    {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        it()
-                    }
-                },
-            ),
-    ) {
-        content(Modifier)
     }
 }
 

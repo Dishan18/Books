@@ -2,8 +2,15 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.androidx.room)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+}
+
+// Exported schemas let migrations be tested against the exact previous database layout.
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 android {
@@ -19,6 +26,12 @@ android {
         val (major, minor, patch) = (version.split(".").map { it.toIntOrNull() ?: 0 } + listOf(0, 0, 0)).take(3)
         versionName = version
         versionCode = major * 10_000 + minor * 100 + patch
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    sourceSets {
+        // Instrumented migration tests read the exported Room schemas.
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
     }
 
     // One fixed key for every build, so APKs from your PC and from GitHub install over each other
@@ -59,6 +72,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -102,4 +116,22 @@ dependencies {
     implementation(libs.readium.shared)
     implementation(libs.readium.streamer)
     implementation(libs.readium.navigator)
+
+    // Manga
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
