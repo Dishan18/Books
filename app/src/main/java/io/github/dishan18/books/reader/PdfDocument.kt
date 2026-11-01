@@ -2,6 +2,7 @@ package io.github.dishan18.books.reader
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import android.util.LruCache
@@ -41,8 +42,8 @@ class PdfDocument(file: File) {
 
     fun cached(index: Int, width: Int): Bitmap? = cache.get(key(index, width))
 
-    /** Renders page [index] at [width] pixels wide. Pass [keep] = false for one-off zoomed renders. */
-    suspend fun render(index: Int, width: Int, keep: Boolean = true): Bitmap? {
+    /** Renders page [index] at [width] pixels wide. */
+    suspend fun render(index: Int, width: Int): Bitmap? {
         cached(index, width)?.let { return it }
         return withContext(dispatcher) {
             if (closed) return@withContext null
@@ -52,11 +53,32 @@ class PdfDocument(file: File) {
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 bitmap.eraseColor(Color.WHITE)
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                if (keep) cache.put(key(index, width), bitmap)
+                cache.put(key(index, width), bitmap)
                 bitmap
             }
         }
     }
+
+    /**
+     * Renders the on-screen part of a zoomed page into a [width]×[height] bitmap, with the page
+     * drawn [pageWidth] pixels wide and its top-left corner at ([left], [top]). Areas outside the
+     * page stay white, which the theme filters turn into the reader background.
+     */
+    suspend fun renderRegion(index: Int, width: Int, height: Int, left: Float, top: Float, pageWidth: Float): Bitmap? =
+        withContext(dispatcher) {
+            if (closed) return@withContext null
+            renderer.openPage(index).use { page ->
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(Color.WHITE)
+                val scale = pageWidth / page.width
+                val transform = Matrix().apply {
+                    setScale(scale, scale)
+                    postTranslate(left, top)
+                }
+                page.render(bitmap, null, transform, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                bitmap
+            }
+        }
 
     fun close() {
         // Wait for any render in flight before closing the renderer underneath it.

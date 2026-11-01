@@ -1,6 +1,5 @@
 package io.github.dishan18.books.reader
 
-import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,7 +15,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,6 +25,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerScope
+import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -47,6 +49,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -54,17 +57,18 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.dishan18.books.app
+import io.github.dishan18.books.data.PageDirection
 import io.github.dishan18.books.data.ReaderSettingsStore
 import io.github.dishan18.books.data.ReaderTheme
 import io.github.dishan18.books.ui.theme.BooksTheme
 import kotlinx.coroutines.launch
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import androidx.compose.ui.util.lerp as lerpFloat
 
@@ -118,7 +122,8 @@ private fun PdfReaderScreen(
                 Text(s.message, color = theme.content, textAlign = TextAlign.Center)
                 TextButton(onClick = onClose) { Text("Back to library") }
             }
-            is PdfReaderViewModel.State.Ready -> PdfReader(s, viewModel, settingsStore, theme, onClose, onWindowChange)
+            is PdfReaderViewModel.State.Ready ->
+                PdfReader(s, viewModel, settingsStore, theme, settings.pageDirection, onClose, onWindowChange)
         }
     }
 }
@@ -129,6 +134,7 @@ private fun PdfReader(
     viewModel: PdfReaderViewModel,
     settingsStore: ReaderSettingsStore,
     theme: ReaderTheme,
+    pageDirection: PageDirection,
     onClose: () -> Unit,
     onWindowChange: (ReaderTheme, Boolean) -> Unit,
 ) {
@@ -160,12 +166,16 @@ private fun PdfReader(
         }
     }
 
-    val onTap by rememberUpdatedState { position: Offset, width: Int ->
+    val vertical = pageDirection == PageDirection.VERTICAL
+
+    // Edge taps turn pages: left/right edges side to side, top/bottom edges up and down.
+    val onTap by rememberUpdatedState { position: Offset, size: IntSize ->
+        val along = if (vertical) position.y / size.height else position.x / size.width
         when {
             chromeVisible -> chromeVisible = false
             zoomed -> chromeVisible = true
-            position.x < width * 0.25f -> turn(-1)
-            position.x > width * 0.75f -> turn(+1)
+            along < 0.25f -> turn(-1)
+            along > 0.75f -> turn(+1)
             else -> chromeVisible = true
         }
     }
@@ -173,26 +183,52 @@ private fun PdfReader(
     Box(
         Modifier
             .fillMaxSize()
-            .pointerInput(Unit) { detectTapGestures { onTap(it, size.width) } },
+            .pointerInput(Unit) {
+                // A tap only if the finger barely moved, so a drag across the pager's direction
+                // (which nothing consumes) doesn't toggle the controls.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                    if ((up.position - down.position).getDistance() < viewConfiguration.touchSlop) {
+                        onTap(up.position, size)
+                    }
+                }
+            },
     ) {
-        HorizontalPager(
+        val flingBehavior = PagerDefaults.flingBehavior(
             state = pagerState,
-            beyondViewportPageCount = 1,
-            pageSpacing = 12.dp,
-            userScrollEnabled = !zoomed,
-            key = { it },
-            flingBehavior = PagerDefaults.flingBehavior(
-                state = pagerState,
-                snapAnimationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-            ),
-            modifier = Modifier.fillMaxSize(),
-        ) { page ->
+            snapAnimationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        )
+        val pageContent: @Composable PagerScope.(Int) -> Unit = { page ->
             PdfPage(
                 document = document,
                 index = page,
                 theme = theme,
                 isCurrent = page == pagerState.currentPage,
                 onZoomChange = { if (page == pagerState.currentPage) zoomed = it },
+            )
+        }
+        if (vertical) {
+            VerticalPager(
+                state = pagerState,
+                beyondViewportPageCount = 1,
+                pageSpacing = 12.dp,
+                userScrollEnabled = !zoomed,
+                key = { it },
+                flingBehavior = flingBehavior,
+                modifier = Modifier.fillMaxSize(),
+                pageContent = pageContent,
+            )
+        } else {
+            HorizontalPager(
+                state = pagerState,
+                beyondViewportPageCount = 1,
+                pageSpacing = 12.dp,
+                userScrollEnabled = !zoomed,
+                key = { it },
+                flingBehavior = flingBehavior,
+                modifier = Modifier.fillMaxSize(),
+                pageContent = pageContent,
             )
         }
 
@@ -218,6 +254,8 @@ private fun PdfReader(
         PdfSheet.Settings -> ReaderSettingsSheet(
             theme = theme,
             onThemeChange = settingsStore::setTheme,
+            pageDirection = pageDirection,
+            onPageDirectionChange = settingsStore::setPageDirection,
             onDismiss = { sheet = null },
         )
         PdfSheet.Bookmarks -> BookmarksSheet(
@@ -259,14 +297,26 @@ private val sepiaPageFilter = ColorFilter.colorMatrix(
     ),
 )
 
+/** Same idea as sepia, with a soft blush paper colour. */
+private val pinkPageFilter = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            0.988f, 0f, 0f, 0f, 0f,
+            0f, 0.933f, 0f, 0f, 0f,
+            0f, 0f, 0.949f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+    ),
+)
+
 private fun pageFilter(theme: ReaderTheme): ColorFilter? = when (theme) {
     ReaderTheme.LIGHT -> null
     ReaderTheme.SEPIA -> sepiaPageFilter
+    ReaderTheme.PINK -> pinkPageFilter
     ReaderTheme.DARK -> darkPageFilter
 }
 
 private const val MAX_ZOOM = 5f
-private const val SHARP_RENDER_LIMIT = 2.5f
 
 @Composable
 private fun PdfPage(
@@ -296,7 +346,9 @@ private fun PdfPage(
 
         var scale by remember { mutableFloatStateOf(1f) }
         var offset by remember { mutableStateOf(Offset.Zero) }
-        var settledScale by remember { mutableFloatStateOf(1f) }
+        // Bumped whenever the page comes to rest at a new zoom or position.
+        var settledGeneration by remember { mutableIntStateOf(0) }
+        var transforming by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
 
         fun clamp(value: Offset, atScale: Float): Offset {
@@ -309,7 +361,7 @@ private fun PdfPage(
             if (!animated) {
                 scale = 1f
                 offset = Offset.Zero
-                settledScale = 1f
+                settledGeneration++
                 return
             }
             val startScale = scale
@@ -319,7 +371,7 @@ private fun PdfPage(
                     scale = lerpFloat(startScale, 1f, t)
                     offset = lerp(startOffset, Offset.Zero, t)
                 }
-                settledScale = 1f
+                settledGeneration++
             }
         }
 
@@ -327,18 +379,28 @@ private fun PdfPage(
             if (!isCurrent && scale != 1f) resetZoom(animated = false)
         }
 
-        // When zoomed in, re-render this page at a higher resolution so text stays crisp.
-        val sharp by produceState<Bitmap?>(null, settledScale, renderWidth) {
-            value = if (settledScale > 1.3f) {
-                val width = (renderWidth * min(settledScale, SHARP_RENDER_LIMIT)).roundToInt()
-                document.render(index, width, keep = false)
-            } else {
-                null
+        // When zoomed in and still, render just the visible part of the page at screen resolution
+        // and lay it over the scaled-up page, so text stays crisp at any zoom without ever
+        // allocating a bitmap bigger than the screen (very large bitmaps silently fail to draw).
+        val sharp by produceState<SharpRegion?>(null, settledGeneration, renderWidth) {
+            val zoom = scale
+            if (zoom < 1.05f) {
+                value = null
+                return@produceState
             }
+            val pageLeft = boxWidth / 2f + offset.x - zoom * fitWidth / 2f
+            val pageTop = boxHeight / 2f + offset.y - zoom * fitHeight / 2f
+            document.renderRegion(
+                index = index,
+                width = boxWidth.roundToInt().coerceAtLeast(1),
+                height = boxHeight.roundToInt().coerceAtLeast(1),
+                left = pageLeft,
+                top = pageTop,
+                pageWidth = fitWidth * zoom,
+            )?.let { value = SharpRegion(it.asImageBitmap(), settledGeneration) }
         }
 
-        val shown = sharp ?: bitmap
-        val image = remember(shown) { shown?.asImageBitmap() }
+        val image = remember(bitmap) { bitmap?.asImageBitmap() }
         val density = LocalDensity.current
 
         Box(
@@ -352,8 +414,11 @@ private fun PdfPage(
                             val event = awaitPointerEvent()
                             val fingers = event.changes.count { it.pressed }
                             // One finger at 1x belongs to the pager; pinches and zoomed pans are ours.
-                            if (fingers >= 2 || scale > 1.01f) {
+                            // The lift event has no pressed fingers, so no centroid: skip it, or the
+                            // offset becomes NaN and the page vanishes.
+                            if (fingers >= 1 && (fingers >= 2 || scale > 1.01f)) {
                                 transformed = true
+                                transforming = true
                                 val zoom = event.calculateZoom()
                                 val pan = event.calculatePan()
                                 val centroid = event.calculateCentroid(useCurrent = true)
@@ -367,11 +432,12 @@ private fun PdfPage(
                         } while (event.changes.any { it.pressed })
 
                         if (transformed) {
+                            transforming = false
                             if (scale < 1.05f) {
                                 resetZoom(animated = true)
                                 onZoomChange(false)
                             } else {
-                                settledScale = scale
+                                settledGeneration++
                                 onZoomChange(true)
                             }
                         }
@@ -400,6 +466,20 @@ private fun PdfPage(
                     )
                 }
             }
+
+            // Only while at rest and matching the current zoom; during a gesture the scaled page shows.
+            val region = sharp
+            if (region != null && region.generation == settledGeneration && !transforming && scale > 1.01f) {
+                Image(
+                    bitmap = region.bitmap,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    colorFilter = pageFilter(theme),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }
+
+private class SharpRegion(val bitmap: ImageBitmap, val generation: Int)

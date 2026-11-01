@@ -10,7 +10,8 @@ Built with Kotlin and Jetpack Compose. EPUB rendering by the [Readium Kotlin too
 - **Import**: tap **Add books** to pick several PDFs and EPUBs, or use *Open with → Books* / *Share → Books* from Files, Drive or Gmail. Files are copied into the app, so deleting the original doesn't remove the book.
 - **PDF reader**: swipe or tap the left/right edges to turn pages. Pinch to zoom; pages are re-rendered sharper as you zoom in.
 - **EPUB reader**: reflowable text with adjustable size, a table of contents, and the same tap and swipe navigation.
-- **Light, Sepia and Dark** reading themes. In Dark mode PDF pages are inverted to white text on dark grey.
+- **Light, Sepia, Pink and Dark** reading themes. In Dark mode PDF pages are inverted to white text on dark grey.
+- **Page turning** side to side or up and down (EPUBs scroll continuously when set to up and down).
 - **Bookmarks** and a page slider in both readers. Each book reopens where you left off.
 - Long-press a book to remove it.
 

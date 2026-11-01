@@ -36,6 +36,7 @@ import io.github.dishan18.books.R
 import io.github.dishan18.books.app
 import io.github.dishan18.books.data.Book
 import io.github.dishan18.books.data.Bookmark
+import io.github.dishan18.books.data.PageDirection
 import io.github.dishan18.books.data.ReaderSettings
 import io.github.dishan18.books.data.ReaderTheme
 import io.github.dishan18.books.ui.theme.BooksTheme
@@ -276,6 +277,8 @@ class EpubReaderActivity : AppCompatActivity() {
             Sheet.Settings -> ReaderSettingsSheet(
                 theme = theme,
                 onThemeChange = settingsStore::setTheme,
+                pageDirection = settings.pageDirection,
+                onPageDirectionChange = settingsStore::setPageDirection,
                 onDismiss = { sheet = null },
                 fontScale = settings.fontScale,
                 onFontScaleChange = settingsStore::setFontScale,
@@ -307,7 +310,8 @@ class EpubReaderActivity : AppCompatActivity() {
 
         fun preferencesFor(settings: ReaderSettings) = EpubPreferences(
             theme = when (settings.theme) {
-                ReaderTheme.LIGHT -> Theme.LIGHT
+                // Readium has no pink theme; its light theme plus our colours below gives the same look.
+                ReaderTheme.LIGHT, ReaderTheme.PINK -> Theme.LIGHT
                 ReaderTheme.SEPIA -> Theme.SEPIA
                 ReaderTheme.DARK -> Theme.DARK
             },
@@ -315,7 +319,8 @@ class EpubReaderActivity : AppCompatActivity() {
             backgroundColor = Color(settings.theme.background.toArgb()),
             textColor = Color(settings.theme.content.toArgb()),
             fontSize = settings.fontScale,
-            scroll = false,
+            // Up and down scrolls continuously; side to side turns pages.
+            scroll = settings.pageDirection == PageDirection.VERTICAL,
         )
 
         fun flatten(links: List<Link>, depth: Int): List<Pair<ContentsEntry, Link>> = links.flatMap { link ->

@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.dishan18.books.data.Bookmark
+import io.github.dishan18.books.data.PageDirection
 import io.github.dishan18.books.data.ReaderTheme
 import kotlin.math.roundToInt
 
@@ -256,6 +259,8 @@ private fun SheetTitle(text: String) {
 fun ReaderSettingsSheet(
     theme: ReaderTheme,
     onThemeChange: (ReaderTheme) -> Unit,
+    pageDirection: PageDirection,
+    onPageDirectionChange: (PageDirection) -> Unit,
     onDismiss: () -> Unit,
     fontScale: Double? = null,
     onFontScaleChange: ((Double) -> Unit)? = null,
@@ -315,6 +320,48 @@ fun ReaderSettingsSheet(
                     Text(
                         option.name.lowercase().replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            "Page turning",
+            style = MaterialTheme.typography.labelLarge,
+            color = theme.content.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            Modifier
+                .padding(horizontal = 24.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(theme.content.copy(alpha = 0.06f))
+                .padding(4.dp),
+        ) {
+            PageDirection.entries.forEach { option ->
+                val selected = option == pageDirection
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) theme.background else Color.Transparent)
+                        .clickable { onPageDirectionChange(option) },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        if (option == PageDirection.HORIZONTAL) Icons.Outlined.SwapHoriz else Icons.Outlined.SwapVert,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (option == PageDirection.HORIZONTAL) "Side to side" else "Up and down",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 }
             }
