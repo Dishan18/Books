@@ -271,9 +271,9 @@ private fun PagePlaceholder(item: ReaderItem.Placeholder, onRetry: () -> Unit) {
 @Composable
 private fun PageStripImage(item: ReaderItem.PageStrip, decoder: StripDecoder) {
     val density = LocalDensity.current
-    val key = "${item.file.path}#${item.strip.top}-${item.strip.bottom}@${item.sampleSize}"
+    val key = "${item.file.path}#${item.strip.top}-${item.strip.bottom}@${item.sampleSize}w${item.displayWidth}"
     val bitmap by produceState(decoder.cached(key), key) {
-        if (value == null) value = decoder.decode(key, item.file, item.imageWidth, item.strip, item.sampleSize)
+        if (value == null) value = decoder.decode(key, item.file, item.imageWidth, item.strip, item.sampleSize, item.displayWidth)
     }
     val image = remember(bitmap) { bitmap?.asImageBitmap() }
     Box(Modifier.fillMaxWidth().height(with(density) { item.strip.displayHeight.toDp() })) {

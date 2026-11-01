@@ -12,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.dishan18.books.app
+import io.github.dishan18.books.widget.ReadingWidget
 import io.github.dishan18.books.data.ReaderTheme
 import io.github.dishan18.books.rewards.data.ReadingKind
 import io.github.dishan18.books.reader.applyReaderWindow
@@ -51,6 +52,12 @@ class WebtoonReaderActivity : ComponentActivity() {
         super.onPause()
         screenAwake.stop()
         app.rewards.pause()
+        ReadingWidget.refresh(this)
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_UI_HIDDEN) viewModel.decoder.trim(background = level >= TRIM_MEMORY_BACKGROUND)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -59,10 +66,11 @@ class WebtoonReaderActivity : ComponentActivity() {
         return super.dispatchTouchEvent(event)
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    // Key presses (volume keys scroll) count as using the reader too.
+    override fun onUserInteraction() {
+        super.onUserInteraction()
         screenAwake.poke()
         app.rewards.ping()
-        return super.dispatchKeyEvent(event)
     }
 
     /** Volume keys scroll by most of a screen. */

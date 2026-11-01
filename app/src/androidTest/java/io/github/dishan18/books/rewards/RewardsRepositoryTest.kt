@@ -47,9 +47,13 @@ class RewardsRepositoryTest {
         context.getSharedPreferences("rewards", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
-    private fun repository(today: Long = day) =
-        RewardsRepository(context, db.rewards(), RewardsSettings(context), clock = { now }, today = { today }, hour = { 21 })
+    private var currentDay = day
+
+    private fun repository(today: Long = day): RewardsRepository {
+        currentDay = today
+        return RewardsRepository(context, db.rewards(), RewardsSettings(context), clock = { now }, today = { currentDay }, hour = { 21 })
             .also { repo -> collector.launch { repo.events.collect { events += it } } }
+    }
 
     private suspend fun waitFor(condition: suspend () -> Boolean) = withTimeout(5_000) {
         while (!condition()) delay(20)
@@ -114,6 +118,65 @@ class RewardsRepositoryTest {
         assertEquals(1, db.rewards().countFinished(FinishKind.BOOK))
         delay(200)
         assertEquals(1, events.count { it is RewardEvent.BookFinished })
+    }
+
+    @Test
+    fun aNewDayRollsOverWithoutRestarting() = runBlocking {
+        val repo = repository()
+        repo.read(minutes = 6)
+        waitFor { repo.progress.value.todayDone && repo.progress.value.currentStreak == 1 }
+
+        currentDay = day + 1
+        repo.refreshDay()
+        waitFor { repo.progress.value.today == day + 1 }
+        assertEquals("yesterday's reading still counts", 1, repo.progress.value.currentStreak)
+        assertEquals(false, repo.progress.value.todayDone)
+        assertEquals(0L, repo.progress.value.todaySeconds)
+
+        repo.read(minutes = 5)
+        waitFor { repo.progress.value.currentStreak == 2 }
+    }
+
+    @Test
+    fun forwardPageTurnsAreCountedPerDayAndSession() = runBlocking {
+        val repo = repository()
+        repo.resume(ReadingKind.BOOK) { "book-1" to "A Book" }
+        repeat(3) {
+            now += 20_000
+            repo.ping()
+            repo.pageTurned()
+        }
+        repo.pause()
+        waitFor { db.rewards().getDay(day)?.pages == 3 }
+        assertEquals(60L, db.rewards().getDay(day)!!.activeSeconds)
+        assertEquals(listOf(3), db.rewards().sessionsBetween(day, day).map { it.pages })
+
+        repo.pageTurned() // No reader open: nothing to count.
+        delay(200)
+        assertEquals(3, db.rewards().getDay(day)!!.pages)
+    }
+
+    @Test
+    fun rapidTouchesAreThrottledWithoutLosingTime() = runBlocking {
+        val repo = repository()
+        repo.resume(ReadingKind.MANGA) { "1" to "A Series" }
+        // A scroll: a touch event every 10 ms for 90 seconds.
+        repeat(9_000) {
+            now += 10
+            repo.ping()
+        }
+        repo.pause()
+        waitFor { db.rewards().getDay(day) != null }
+        assertEquals(90L, db.rewards().getDay(day)!!.activeSeconds)
+    }
+
+    @Test
+    fun unlocksStayOnceALevelIsReached() = runBlocking {
+        RewardsSettings(context).update { it.copy(lastLevel = 4) }
+        val repo = repository()
+        delay(100)
+        assertEquals("Pink is a level 4 reward, already reached", null, repo.lockedLevel(io.github.dishan18.books.data.ReaderTheme.PINK))
+        assertEquals(5, repo.lockedLevel(io.github.dishan18.books.data.ReaderTheme.FOREST))
     }
 
     @Test

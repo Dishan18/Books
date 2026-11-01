@@ -174,10 +174,11 @@ class LocalSource(private val root: File) : MangaSource {
 
         private fun File.nameWithoutExtensionIfArchive() = if (isFile && isArchive(name)) nameWithoutExtension else name
 
-        private fun encode(vararg parts: String) = parts.joinToString("/") { URLEncoder.encode(it, Charsets.UTF_8) }
+        // The charset-name overloads: the Charset ones need Android 13.
+        private fun encode(vararg parts: String) = parts.joinToString("/") { URLEncoder.encode(it, "UTF-8") }
 
         private fun decode(url: String): Triple<String, String, String> {
-            val parts = url.split('/').map { URLDecoder.decode(it, Charsets.UTF_8) }
+            val parts = url.split('/').map { URLDecoder.decode(it, "UTF-8") }
             require(parts.size == 3) { "Invalid local page" }
             return Triple(parts[0], parts[1], parts[2])
         }

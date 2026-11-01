@@ -6,9 +6,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +30,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -50,23 +57,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.dishan18.books.R
 import io.github.dishan18.books.app
+import io.github.dishan18.books.rewards.AppIcons
 import io.github.dishan18.books.rewards.ProgressState
 import io.github.dishan18.books.rewards.ReadingReminderWorker
+import io.github.dishan18.books.rewards.engine.AppIcon
 import io.github.dishan18.books.rewards.engine.BadgeCatalog
 import io.github.dishan18.books.rewards.engine.Levels
 import io.github.dishan18.books.rewards.engine.Perks
+import io.github.dishan18.books.year.YearInBooksActivity
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
-import java.util.Locale
 
 private val FlameOrange = Color(0xFFFF7A1A)
 private val FlameGold = Color(0xFFFFC233)
@@ -81,6 +97,11 @@ fun ProgressScreen() {
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     LaunchedEffect(Unit) { rewards.markBadgesSeen() }
+    // Coming back after midnight shows the new day straight away.
+    LifecycleResumeEffect(Unit) {
+        rewards.refreshDay()
+        onPauseOrDispose { }
+    }
     LaunchedEffect(prefs.enabled, prefs.reminderEnabled, prefs.reminderAt) { ReadingReminderWorker.sync(context, prefs) }
 
     Column(
@@ -97,6 +118,11 @@ fun ProgressScreen() {
         }
         Heatmap(state)
         StatsRow(state)
+        if (state.totalSeconds > 0 || state.booksFinished > 0 || state.chaptersRead > 0) {
+            YearInBooksCard(year = LocalDate.ofEpochDay(state.today).year) {
+                context.startActivity(Intent(context, YearInBooksActivity::class.java))
+            }
+        }
         if (prefs.enabled) {
             BadgesSection(state)
             PerksSection(state)
@@ -131,7 +157,7 @@ private fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit)
 private fun StreakCard(state: ProgressState) {
     val goal = state.prefs.goalSeconds
     val fraction by animateFloatAsState((state.todaySeconds.toFloat() / goal).coerceIn(0f, 1f), spring(dampingRatio = 0.8f), label = "goal")
-    val golden = state.level >= Perks.all.last().level
+    val golden = state.unlockedLevel >= Perks.GOLDEN_FLAME_LEVEL
     Card {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -190,18 +216,19 @@ private fun StreakCard(state: ProgressState) {
     }
 }
 
+/** The last seven days, ending today, so the streak reads as the run of days it is. */
 @Composable
 private fun WeekStrip(state: ProgressState) {
     val today = LocalDate.ofEpochDay(state.today)
-    val monday = today.with(DayOfWeek.MONDAY)
+    val locale = LocalConfiguration.current.locales[0]
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        (0L..6L).forEach { offset ->
-            val date = monday.plusDays(offset)
+        (6L downTo 0L).forEach { daysAgo ->
+            val date = today.minusDays(daysAgo)
             val record = state.days[date.toEpochDay()]
             val isToday = date == today
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                    date.dayOfWeek.getDisplayName(TextStyle.NARROW, locale),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -305,6 +332,30 @@ private fun Heatmap(state: ProgressState) {
     }
 }
 
+/** Opens the annual recap. */
+@Composable
+private fun YearInBooksCard(year: Int, onOpen: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF2B1B4D), Color(0xFFB4462A))))
+            .clickable(onClick = onOpen)
+            .padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("$year in Books", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(
+                "Your year of reading, recapped",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.8f),
+            )
+        }
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = Color.White)
+    }
+}
+
 @Composable
 private fun StatsRow(state: ProgressState) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -395,7 +446,7 @@ private fun PerksSection(state: ProgressState) {
     Column {
         Text("Rewards", style = MaterialTheme.typography.titleMedium)
         Perks.all.forEach { perk ->
-            val unlocked = state.level >= perk.level
+            val unlocked = state.unlockedLevel >= perk.level
             ListItem(
                 leadingContent = { Text(if (unlocked) "✨" else "🔒", fontSize = 20.sp) },
                 headlineContent = { Text(perk.title) },
@@ -404,13 +455,95 @@ private fun PerksSection(state: ProgressState) {
                 modifier = Modifier.alpha(if (unlocked) 1f else 0.6f),
             )
         }
-        if (Perks.all.any { it.theme != null && state.level >= it.level }) {
+        if (Perks.all.any { it.theme != null && state.unlockedLevel >= it.level }) {
             Text(
                 "Pick unlocked themes from Aa in any reader.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Spacer(Modifier.height(16.dp))
+        AppIconPicker(state.unlockedLevel)
+    }
+}
+
+private class IconLook(val background: Brush, val foreground: Int)
+
+private val iconLooks = mapOf(
+    AppIcon.CLASSIC to IconLook(Brush.linearGradient(listOf(Color(0xFFE9692C), Color(0xFFE9692C))), R.drawable.ic_launcher_foreground),
+    AppIcon.PAPER to IconLook(Brush.linearGradient(listOf(Color(0xFFF6EEDC), Color(0xFFF6EEDC))), R.drawable.ic_launcher_foreground_paper),
+    AppIcon.BLOSSOM to IconLook(Brush.linearGradient(listOf(Color(0xFFEC8FAA), Color(0xFFEC8FAA))), R.drawable.ic_launcher_foreground),
+    AppIcon.MIDNIGHT to IconLook(Brush.linearGradient(listOf(Color(0xFF0F1A2E), Color(0xFF0F1A2E))), R.drawable.ic_launcher_foreground_midnight),
+    AppIcon.GOLD to IconLook(Brush.linearGradient(listOf(Color(0xFFF8CB5A), Color(0xFFDE8A1C))), R.drawable.ic_launcher_foreground),
+)
+
+/** Launcher icon choices; locked ones say which level unlocks them. */
+@Composable
+private fun AppIconPicker(unlockedLevel: Int) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    var current by remember { mutableStateOf(AppIcons.current(context)) }
+    var confirming by remember { mutableStateOf<AppIcon?>(null) }
+    var hint by remember { mutableStateOf<String?>(null) }
+    Column {
+        Text("App icon", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            AppIcon.entries.forEach { icon ->
+                val look = iconLooks.getValue(icon)
+                val unlocked = Perks.isUnlocked(icon, unlockedLevel)
+                val selected = icon == current
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier
+                            .size(60.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(look.background)
+                            .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp)) else Modifier)
+                            .clickable {
+                                when {
+                                    selected -> Unit
+                                    unlocked -> confirming = icon
+                                    else -> {
+                                        haptic.performHapticFeedback(HapticFeedbackType.Reject)
+                                        hint = "Reach level ${Perks.unlockLevel(icon)} to unlock the ${icon.title} icon"
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(painterResource(look.foreground), contentDescription = null, modifier = Modifier.size(84.dp).alpha(if (unlocked) 1f else 0.35f))
+                        if (!unlocked) Icon(Icons.Outlined.Lock, contentDescription = "Locked", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (unlocked) icon.title else "Level ${Perks.unlockLevel(icon)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        hint?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    confirming?.let { icon ->
+        AlertDialog(
+            onDismissRequest = { confirming = null },
+            title = { Text("Use the ${icon.title} icon?") },
+            text = { Text("Your home screen may take a moment to update. If Books disappears from your home screen, add it again from the app drawer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    AppIcons.set(context, icon)
+                    current = icon
+                    confirming = null
+                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                }) { Text("Change icon") }
+            },
+            dismissButton = { TextButton(onClick = { confirming = null }) { Text("Cancel") } },
+        )
     }
 }
 
@@ -425,6 +558,8 @@ private fun SettingsCard(
     onEnabled: (Boolean) -> Unit,
 ) {
     val prefs = state.prefs
+    val haptic = LocalHapticFeedback.current
+    val toggled = { on: Boolean -> haptic.performHapticFeedback(if (on) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff) }
     var pickingTime by remember { mutableStateOf(false) }
     Card {
         Column {
@@ -432,7 +567,14 @@ private fun SettingsCard(
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(1, 5, 10, 15, 30, 60).forEach { minutes ->
-                    FilterChip(selected = prefs.goalMinutes == minutes, onClick = { onGoal(minutes) }, label = { Text("$minutes min") })
+                    FilterChip(
+                        selected = prefs.goalMinutes == minutes,
+                        onClick = {
+                            if (prefs.goalMinutes != minutes) haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            onGoal(minutes)
+                        },
+                        label = { Text("$minutes min") },
+                    )
                 }
             }
             val transparent = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -445,14 +587,14 @@ private fun SettingsCard(
                             modifier = Modifier.clickable(enabled = prefs.reminderEnabled) { pickingTime = true },
                         )
                     },
-                    trailingContent = { Switch(prefs.reminderEnabled, onCheckedChange = onReminder) },
+                    trailingContent = { Switch(prefs.reminderEnabled, onCheckedChange = { toggled(it); onReminder(it) }) },
                     colors = transparent,
                     modifier = Modifier.clickable(enabled = prefs.reminderEnabled) { pickingTime = true },
                 )
                 ListItem(
                     headlineContent = { Text("Vacation mode") },
                     supportingContent = { Text("Pause your streak without losing it") },
-                    trailingContent = { Switch(prefs.vacationSince != null, onCheckedChange = onVacation) },
+                    trailingContent = { Switch(prefs.vacationSince != null, onCheckedChange = { toggled(it); onVacation(it) }) },
                     colors = transparent,
                 )
             }
@@ -461,7 +603,7 @@ private fun SettingsCard(
                 supportingContent = {
                     Text(if (prefs.enabled) "Turn off for just stats: no streaks, badges or reminders" else "Off: reading time is still counted for your stats")
                 },
-                trailingContent = { Switch(prefs.enabled, onCheckedChange = onEnabled) },
+                trailingContent = { Switch(prefs.enabled, onCheckedChange = { toggled(it); onEnabled(it) }) },
                 colors = transparent,
             )
             Text(

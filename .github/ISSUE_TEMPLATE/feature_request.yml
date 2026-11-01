@@ -1,0 +1,34 @@
+name: Feature idea
+description: Suggest something that would make reading in Books better
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Books stays private, ad-free and minimal. Ideas that keep it that way are very welcome.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The problem or situation, in your words. "When I'm reading a long webtoon, I want to ..."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How might it work?
+      description: Your idea for the feature. Sketches and screenshots of other apps are welcome.
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fits the project
+      options:
+        - label: It needs no ads, accounts, tracking or third-party SDKs
+          required: true
+        - label: Any online content it uses comes from a documented API, a public catalog or the user's own server
+          required: true
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to work on this myself

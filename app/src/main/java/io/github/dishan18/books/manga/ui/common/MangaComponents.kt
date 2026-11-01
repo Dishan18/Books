@@ -20,7 +20,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +44,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
@@ -69,11 +72,23 @@ fun MangaCover(
     modifier: Modifier = Modifier,
     elevation: Float = 5f,
 ) {
-    val context = LocalContext.current
     val module = mangaModule()
-    val request = remember(url, sourceId) {
+    val headers = remember(sourceId) { module.sources.peek(sourceId)?.imageHeaders().orEmpty() }
+    RemoteCover(url, headers, title, modifier, elevation)
+}
+
+/** A cover image from the web (with any [headers] its server needs) and a generated fallback. */
+@Composable
+fun RemoteCover(
+    url: String?,
+    headers: Map<String, String>,
+    title: String,
+    modifier: Modifier = Modifier,
+    elevation: Float = 5f,
+) {
+    val context = LocalContext.current
+    val request = remember(url, headers) {
         url?.let {
-            val headers = module.sources.peek(sourceId)?.imageHeaders().orEmpty()
             ImageRequest.Builder(context)
                 .data(it)
                 .httpHeaders(NetworkHeaders.Builder().apply { headers.forEach { (k, v) -> set(k, v) } }.build())
@@ -86,16 +101,18 @@ fun MangaCover(
             .clip(CoverShape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (request == null) {
+        // AsyncImage rather than SubcomposeAsyncImage: no subcomposition per tile, so grids scroll
+        // lighter. The box's own background is the loading state.
+        var failed by remember(request) { mutableStateOf(false) }
+        if (request == null || failed) {
             CoverPlaceholder(title)
         } else {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-                error = { CoverPlaceholder(title) },
-                loading = { Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) },
+                onError = { failed = true },
             )
         }
     }

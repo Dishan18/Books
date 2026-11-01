@@ -80,6 +80,11 @@ class PdfDocument(file: File) {
             }
         }
 
+    /** While the reader is hidden keep only the most recent pages; in the background, none. */
+    fun trim(background: Boolean) {
+        if (background) cache.evictAll() else cache.trimToSize(cache.maxSize() / 4)
+    }
+
     fun close() {
         // Wait for any render in flight before closing the renderer underneath it.
         CoroutineScope(dispatcher).launch {

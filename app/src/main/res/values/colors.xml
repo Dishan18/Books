@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="library_background">#FFFBF8F3</color>
+    <color name="year_background">#FF1B1033</color>
     <color name="ic_launcher_background">#FFE9692C</color>
+    <color name="ic_launcher_background_paper">#FFF6EEDC</color>
+    <color name="ic_launcher_background_blossom">#FFEC8FAA</color>
+    <color name="ic_launcher_background_midnight">#FF0F1A2E</color>
 </resources>

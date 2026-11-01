@@ -51,11 +51,15 @@ class PdfReaderViewModel(
     }
 
     private var firstSettle = true
+    private var lastSettledPage = -1
 
     fun onPageSettled(page: Int, pageCount: Int) {
         viewModelScope.launch {
             repository.saveLocation(bookId, page.toString(), progressOf(page, pageCount))
         }
+        // Moving forward counts as a page read; jumps count once, going back doesn't count.
+        if (lastSettledPage in 0 until page) rewards.pageTurned()
+        lastSettledPage = page
         // Turning onto the last page finishes the book (reopening one already there doesn't).
         val opened = firstSettle
         firstSettle = false

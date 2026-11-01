@@ -1,11 +1,5 @@
 package io.github.dishan18.books.manga.ui
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
@@ -19,6 +13,7 @@ import io.github.dishan18.books.manga.ui.home.MangaHomeScreen
 import io.github.dishan18.books.manga.ui.series.SeriesScreen
 import io.github.dishan18.books.manga.ui.sources.KomgaEditScreen
 import io.github.dishan18.books.manga.ui.sources.SourcesScreen
+import io.github.dishan18.books.ui.NavTransitions
 import kotlinx.serialization.Serializable
 
 @Serializable object MangaHomeRoute
@@ -33,8 +28,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class KomgaRoute(val sourceId: String? = null)
 
-private const val DURATION = 320
-
 @Composable
 fun MangaNavHost(nav: NavHostController) {
     val context = LocalContext.current
@@ -44,11 +37,10 @@ fun MangaNavHost(nav: NavHostController) {
     NavHost(
         navController = nav,
         startDestination = MangaHomeRoute,
-        // Push/pop like iOS: the new screen slides over, the old one drifts back a little.
-        enterTransition = { slideInHorizontally(tween(DURATION, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(DURATION)) },
-        exitTransition = { slideOutHorizontally(tween(DURATION, easing = FastOutSlowInEasing)) { -it / 4 } + fadeOut(tween(DURATION)) },
-        popEnterTransition = { slideInHorizontally(tween(DURATION, easing = FastOutSlowInEasing)) { -it / 4 } + fadeIn(tween(DURATION)) },
-        popExitTransition = { slideOutHorizontally(tween(DURATION, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(DURATION)) },
+        enterTransition = NavTransitions.enter,
+        exitTransition = NavTransitions.exit,
+        popEnterTransition = NavTransitions.popEnter,
+        popExitTransition = NavTransitions.popExit,
     ) {
         composable<MangaHomeRoute> {
             MangaHomeScreen(

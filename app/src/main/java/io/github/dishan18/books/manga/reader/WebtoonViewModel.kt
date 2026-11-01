@@ -67,6 +67,8 @@ sealed interface ReaderItem {
         val stripIndex: Int,
         val stripCount: Int,
         val sampleSize: Int,
+        /** Width the strip is shown at (the viewport width). */
+        val displayWidth: Int,
         /** Display pixels of this page above this strip. */
         val offsetInPage: Int,
         val pageHeight: Int,
@@ -189,6 +191,7 @@ class WebtoonViewModel(
         if (shown == null || shown.chapter.id != position.chapter.id || shown.page != position.page) _position.value = position
         latestPosition = position
         progressUpdates.value = position
+        countPageTurn(position)
 
         val readerChapter = chapters.firstOrNull { it.chapter.id == position.chapter.id } ?: return
         prefetchAround(readerChapter, position.page)
@@ -208,6 +211,18 @@ class WebtoonViewModel(
 
         // Load the next chapter while the reader is still a few pages away from the end.
         if (readerChapter === chapters.last() && position.page >= position.pageCount - 3) loadNextChapter()
+    }
+
+    private var lastCounted: ReaderPosition? = null
+
+    /** Scrolling forward onto another page counts as a page turned, as in the book readers. */
+    private fun countPageTurn(position: ReaderPosition) {
+        val last = lastCounted
+        val forward = last != null && (
+            if (position.chapter.id == last.chapter.id) position.page > last.page else position.chapter.sortIndex > last.chapter.sortIndex
+            )
+        if (forward) rewards.pageTurned()
+        lastCounted = position
     }
 
     /** The chapter that [lastVisible] directly follows, if it marks the end of one. */
@@ -408,7 +423,7 @@ class WebtoonViewModel(
                         val pageHeight = strips.sumOf { it.displayHeight }
                         var offset = 0
                         strips.forEachIndexed { i, strip ->
-                            rows += ReaderItem.PageStrip(page, status.file, status.width, strip, i, strips.size, sample, offset, pageHeight)
+                            rows += ReaderItem.PageStrip(page, status.file, status.width, strip, i, strips.size, sample, viewportWidth, offset, pageHeight)
                             offset += strip.displayHeight
                         }
                     }

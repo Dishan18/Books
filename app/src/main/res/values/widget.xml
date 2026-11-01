@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background">#FFFBF8F3</color>
+    <color name="widget_text">#FF1C1B1A</color>
+    <color name="widget_subtle">#FF6E6862</color>
+    <color name="widget_accent">#FFD9581E</color>
+    <color name="widget_track">#22000000</color>
+    <color name="widget_chip">#14D9581E</color>
+    <dimen name="widget_radius">24dp</dimen>
+    <string name="widget_description">What you\'re reading and your daily streak, one tap from your page.</string>
+    <string name="widget_label">CONTINUE READING</string>
+    <string name="widget_preview_title">Pride and Prejudice</string>
+    <string name="widget_preview_author">Jane Austen</string>
+    <string name="widget_preview_streak">🔥 12</string>
+    <string name="widget_preview_percent">42%</string>
+</resources>

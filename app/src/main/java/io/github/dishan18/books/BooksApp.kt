@@ -12,8 +12,10 @@ import io.github.dishan18.books.data.BookRepository
 import io.github.dishan18.books.data.BooksDatabase
 import io.github.dishan18.books.data.Readium
 import io.github.dishan18.books.data.ReaderSettingsStore
+import io.github.dishan18.books.discover.DiscoverModule
 import io.github.dishan18.books.manga.MangaModule
 import io.github.dishan18.books.rewards.RewardsRepository
+import io.github.dishan18.books.ui.CoverCache
 import okio.Path.Companion.toOkioPath
 
 class BooksApp : Application(), SingletonImageLoader.Factory {
@@ -23,6 +25,7 @@ class BooksApp : Application(), SingletonImageLoader.Factory {
     val readerSettings by lazy { ReaderSettingsStore(this) }
     val manga by lazy { MangaModule(this, database) }
     val rewards by lazy { RewardsRepository(this, database.rewards()) }
+    val discover by lazy { DiscoverModule(this) }
 
     /** Coil loads manga covers through the app's shared HTTP client and its own disk cache. */
     override fun newImageLoader(context: PlatformContext): ImageLoader =
@@ -36,6 +39,12 @@ class BooksApp : Application(), SingletonImageLoader.Factory {
             }
             .crossfade(true)
             .build()
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // Coil trims its own memory cache; library covers are ours.
+        if (level >= TRIM_MEMORY_UI_HIDDEN) CoverCache.trim(background = level >= TRIM_MEMORY_BACKGROUND)
+    }
 }
 
 val Context.app: BooksApp get() = applicationContext as BooksApp

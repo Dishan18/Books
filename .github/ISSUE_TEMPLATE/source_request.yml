@@ -1,0 +1,32 @@
+name: Source or catalog request
+description: Suggest a manga source or book catalog to support
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Books only uses documented APIs, public catalogs (such as OPDS) or servers you run yourself. It never scrapes websites or works around paywalls, logins or anti-bot protection.
+  - type: input
+    id: name
+    attributes:
+      label: Source or catalog
+      placeholder: e.g. Kavita, Open Library, a library's OPDS feed
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: Link to its API or catalog documentation
+      description: A source can only be added if its API or catalog is documented, or it's software you host yourself.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What you'd read from it
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Allowed use
+      options:
+        - label: Its terms allow use from a third-party reading app
+          required: true

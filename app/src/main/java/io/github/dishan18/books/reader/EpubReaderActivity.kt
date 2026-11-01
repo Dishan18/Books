@@ -35,6 +35,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.dishan18.books.R
 import io.github.dishan18.books.app
+import io.github.dishan18.books.widget.ReadingWidget
 import io.github.dishan18.books.rewards.data.ReadingKind
 import io.github.dishan18.books.rewards.ui.RewardOverlay
 import io.github.dishan18.books.data.Book
@@ -123,6 +124,7 @@ class EpubReaderActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         app.rewards.pause()
+        ReadingWidget.refresh(this)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -188,9 +190,17 @@ class EpubReaderActivity : AppCompatActivity() {
         locator?.let { onLocatorChanged(it) }
     }
 
+    private var lastCountedPosition: Int? = null
+
     private fun onLocatorChanged(newLocator: Locator) {
         locator = newLocator
         currentPosition = ((newLocator.locations.position ?: 1) - 1).coerceIn(0, (positions.size - 1).coerceAtLeast(0))
+        // Readium positions are page-sized; moving forward counts as a page read (a jump counts once).
+        newLocator.locations.position?.let { position ->
+            val last = lastCountedPosition
+            if (last != null && position > last) app.rewards.pageTurned()
+            if (last == null || position != last) lastCountedPosition = position
+        }
         checkFinished(newLocator)
         lifecycleScope.launch {
             repository.saveLocation(

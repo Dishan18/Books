@@ -93,6 +93,26 @@ class RewardEnginesTest {
         assertFalse(Perks.isUnlocked(io.github.dishan18.books.data.ReaderTheme.MIDNIGHT, level = 2))
         assertTrue(Perks.isUnlocked(io.github.dishan18.books.data.ReaderTheme.MIDNIGHT, level = 3))
         assertTrue("built-in themes are always available", Perks.isUnlocked(io.github.dishan18.books.data.ReaderTheme.SEPIA, level = 1))
-        assertEquals(listOf(3, 5), Perks.newlyUnlocked(2, 5).filter { it.theme != null }.map { it.level })
+        assertEquals(listOf(3, 4, 5), Perks.newlyUnlocked(2, 5).filter { it.theme != null }.map { it.level })
+    }
+
+    @Test
+    fun pinkUnlocksAtLevelFour() {
+        val pink = io.github.dishan18.books.data.ReaderTheme.PINK
+        assertEquals(4, Perks.unlockLevel(pink))
+        assertFalse(Perks.isUnlocked(pink, level = 3))
+        assertTrue(Perks.isUnlocked(pink, level = 4))
+    }
+
+    @Test
+    fun everyAlternativeIconIsAPerkAndClassicIsFree() {
+        assertTrue(Perks.isUnlocked(AppIcon.CLASSIC, level = 1))
+        AppIcon.entries.filter { it != AppIcon.CLASSIC }.forEach { icon ->
+            val level = Perks.unlockLevel(icon)
+            assertTrue("$icon needs a level", level > 1)
+            assertFalse(Perks.isUnlocked(icon, level - 1))
+            assertTrue(Perks.isUnlocked(icon, level))
+        }
+        assertEquals("perks are listed in level order", Perks.all.map { it.level }.sorted(), Perks.all.map { it.level })
     }
 }

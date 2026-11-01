@@ -275,6 +275,7 @@ fun ReaderSettingsSheet(
     /** Level needed to use a theme, or null if it's available. */
     lockedThemeLevel: (ReaderTheme) -> Int? = { null },
 ) {
+    val haptic = LocalHapticFeedback.current
     ReaderSheet(theme, onDismiss) {
         SheetTitle("Themes & Settings")
         if (fontScale != null && onFontScaleChange != null) {
@@ -288,7 +289,10 @@ fun ReaderSettingsSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    Modifier.weight(1f).fillMaxSize().clickable { onFontScaleChange(fontScale - 0.1) },
+                    Modifier.weight(1f).fillMaxSize().clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                        onFontScaleChange(fontScale - 0.1)
+                    },
                     contentAlignment = Alignment.Center,
                 ) { Text("A", fontSize = 15.sp, fontFamily = FontFamily.Serif) }
                 Text(
@@ -298,7 +302,10 @@ fun ReaderSettingsSheet(
                     textAlign = TextAlign.Center,
                 )
                 Box(
-                    Modifier.weight(1f).fillMaxSize().clickable { onFontScaleChange(fontScale + 0.1) },
+                    Modifier.weight(1f).fillMaxSize().clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                        onFontScaleChange(fontScale + 0.1)
+                    },
                     contentAlignment = Alignment.Center,
                 ) { Text("A", fontSize = 24.sp, fontFamily = FontFamily.Serif) }
             }
@@ -325,8 +332,10 @@ fun ReaderSettingsSheet(
                             )
                             .clickable {
                                 if (unlockLevel == null) {
+                                    if (option != theme) haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
                                     onThemeChange(option)
                                 } else {
+                                    haptic.performHapticFeedback(HapticFeedbackType.Reject)
                                     lockedHint = "Reach level $unlockLevel by reading to unlock ${option.label()}"
                                 }
                             },
@@ -379,7 +388,10 @@ fun ReaderSettingsSheet(
                         .height(48.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(if (selected) theme.background else Color.Transparent)
-                        .clickable { onPageDirectionChange(option) },
+                        .clickable {
+                            if (!selected) haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            onPageDirectionChange(option)
+                        },
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

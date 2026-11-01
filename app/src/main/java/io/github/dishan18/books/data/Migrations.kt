@@ -89,4 +89,24 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+/**
+ * v3 → v4: online book catalogs, where a downloaded book came from, book subjects (for Year in
+ * Books), and pages turned per day and session. Additive: existing rows keep every value.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `books` ADD COLUMN `sourceId` TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE `books` ADD COLUMN `sourceKey` TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE `books` ADD COLUMN `subjects` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_books_sourceId_sourceKey` ON `books` (`sourceId`, `sourceKey`)")
+        db.execSQL("ALTER TABLE `reading_sessions` ADD COLUMN `pages` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `reading_days` ADD COLUMN `pages` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `book_sources` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `name` TEXT NOT NULL, " +
+                "`url` TEXT NOT NULL, `username` TEXT, `sortOrder` INTEGER NOT NULL, " +
+                "`addedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+    }
+}
+
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)

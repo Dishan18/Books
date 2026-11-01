@@ -4,6 +4,11 @@
         <item name="android:windowBackground">@color/library_background</item>
     </style>
 
+    <!-- Year in Books opens straight onto its dark first page, without a light flash. -->
+    <style name="Theme.Books.Year">
+        <item name="android:windowBackground">@color/year_background</item>
+    </style>
+
     <style name="Theme.Books.Reader">
         <!-- The reader paints the window with the current reading theme on start. -->
         <item name="android:windowLayoutInDisplayCutoutMode">always</item>

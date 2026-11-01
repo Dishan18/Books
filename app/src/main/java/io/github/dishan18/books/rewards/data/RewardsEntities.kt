@@ -1,5 +1,6 @@
 package io.github.dishan18.books.rewards.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -20,6 +21,8 @@ data class ReadingSession(
     val activeSeconds: Long,
     /** Local calendar day ([java.time.LocalDate.toEpochDay]) the session started on. */
     val day: Long,
+    /** Pages turned forward during the session (counted since v3). */
+    @ColumnInfo(defaultValue = "0") val pages: Int = 0,
 )
 
 /** Reading totals per local calendar day; the source of truth for goals and streaks. */
@@ -32,6 +35,8 @@ data class ReadingDay(
     val frozen: Boolean = false,
     val lateNight: Boolean = false,
     val earlyMorning: Boolean = false,
+    /** Pages turned forward that day (counted since v3). */
+    @ColumnInfo(defaultValue = "0") val pages: Int = 0,
 )
 
 @Entity(tableName = "earned_badges")

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,8 +37,44 @@ import io.github.dishan18.books.data.Book
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private object CoverCache {
-    val bitmaps = LruCache<String, ImageBitmap>(80)
+/**
+ * Decoded covers, bounded by bytes rather than count. Covers are stored 600 px wide but shown at
+ * most ~150 dp, so they're decoded at [DECODE_WIDTH]: under half the memory, and no visible loss.
+ */
+object CoverCache {
+    private const val DECODE_WIDTH = 400
+
+    private val bitmaps = object : LruCache<String, ImageBitmap>(cacheBytes()) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
+    }
+
+    fun get(id: String): ImageBitmap? = bitmaps.get(id)
+
+    fun decode(id: String, file: java.io.File): ImageBitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth <= 0) return null
+        val options = BitmapFactory.Options().apply {
+            // Scale during decode to exactly DECODE_WIDTH (never up).
+            if (bounds.outWidth > DECODE_WIDTH) {
+                inScaled = true
+                inDensity = bounds.outWidth
+                inTargetDensity = DECODE_WIDTH
+            }
+        }
+        return BitmapFactory.decodeFile(file.path, options)?.asImageBitmap()?.also { bitmaps.put(id, it) }
+    }
+
+    fun remove(id: String) {
+        bitmaps.remove(id)
+    }
+
+    /** Frees memory when the system asks: keep a few covers while hidden, none in the background. */
+    fun trim(background: Boolean) {
+        if (background) bitmaps.evictAll() else bitmaps.trimToSize(bitmaps.maxSize() / 4)
+    }
+
+    private fun cacheBytes() = (Runtime.getRuntime().maxMemory() / 8).coerceAtMost(32L * 1024 * 1024).toInt()
 }
 
 val CoverShape = RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp, topEnd = 8.dp, bottomEnd = 8.dp)
@@ -52,12 +89,9 @@ fun BookCover(book: Book, modifier: Modifier = Modifier, elevation: Float = 6f) 
 @Composable
 private fun BookCoverContent(book: Book, modifier: Modifier, elevation: Float) {
     val context = LocalContext.current
-    val cover by produceState(CoverCache.bitmaps.get(book.id), book.hasCover) {
+    val cover by produceState(CoverCache.get(book.id), book.hasCover) {
         if (value != null || !book.hasCover) return@produceState
-        value = withContext(Dispatchers.IO) {
-            val file = context.app.repository.coverOf(book)
-            BitmapFactory.decodeFile(file.path)?.asImageBitmap()
-        }?.also { CoverCache.bitmaps.put(book.id, it) }
+        value = withContext(Dispatchers.IO) { CoverCache.decode(book.id, context.app.repository.coverOf(book)) }
     }
 
     Box(
@@ -66,10 +100,11 @@ private fun BookCoverContent(book: Book, modifier: Modifier, elevation: Float) {
             .clip(CoverShape),
     ) {
         Crossfade(targetState = cover, animationSpec = tween(220), label = "cover") { bitmap ->
-            if (bitmap != null) {
-                Image(bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            } else {
-                GeneratedCover(book)
+            when {
+                bitmap != null -> Image(bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                // Still loading a real cover: a quiet tile, not a generated cover that then flips.
+                book.hasCover -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
+                else -> GeneratedCover(book)
             }
         }
         // A thin highlight down the spine, like light catching a real cover.

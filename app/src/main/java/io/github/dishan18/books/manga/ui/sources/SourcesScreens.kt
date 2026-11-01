@@ -337,7 +337,7 @@ fun KomgaEditScreen(sourceId: String?, onDone: () -> Unit) {
                     form.secret,
                     { v -> viewModel.update { it.copy(secret = v) } },
                     label = { Text(if (form.auth == KomgaAuth.BASIC) "Password" else "API key") },
-                    placeholder = if (form.hasSavedSecret) ({ Text("Saved — leave empty to keep") }) else null,
+                    placeholder = if (form.hasSavedSecret) ({ Text("Saved. Leave empty to keep it") }) else null,
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

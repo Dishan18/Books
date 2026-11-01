@@ -60,6 +60,47 @@ class MigrationTest {
     }
 
     @Test
+    fun migrate3To4_keepsBooksProgressAndRewards() = runTest {
+        helper.createDatabase(dbName, 3).apply {
+            execSQL(
+                "INSERT INTO books (id, title, author, format, fileName, hasCover, addedAt, lastOpenedAt, progress, location) " +
+                    "VALUES ('b1', 'Field Notes', NULL, 'EPUB', 'b1.epub', 1, 1000, 2000, 0.5, '{\"href\":\"ch1.xhtml\"}')",
+            )
+            execSQL("INSERT INTO bookmarks (bookId, location, label, progress, createdAt) VALUES ('b1', '{}', 'Chapter 1', 0.1, 3000)")
+            execSQL("INSERT INTO reading_days (day, activeSeconds, goalMet, frozen, lateNight, earlyMorning) VALUES (20000, 420, 1, 0, 0, 0)")
+            execSQL(
+                "INSERT INTO reading_sessions (kind, itemId, title, startedAt, endedAt, activeSeconds, day) " +
+                    "VALUES ('BOOK', 'b1', 'Field Notes', 10, 20, 420, 20000)",
+            )
+            execSQL("INSERT INTO earned_badges (badgeId, earnedAt, seen) VALUES ('first_steps', 30, 1)")
+            execSQL("INSERT INTO finished_items (kind, itemId, title, finishedAt, day, pages) VALUES ('BOOK', 'b0', 'Old Book', 40, 19990, 320)")
+            close()
+        }
+        helper.runMigrationsAndValidate(dbName, 4, true, MIGRATION_3_4).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.databaseBuilder(context, BooksDatabase::class.java, dbName).addMigrations(*ALL_MIGRATIONS).build()
+        try {
+            val book = db.books().get("b1")!!
+            assertEquals(0.5f, book.progress)
+            assertEquals("{\"href\":\"ch1.xhtml\"}", book.location)
+            assertEquals(null, book.sourceId)
+            assertEquals("", book.subjects)
+            assertEquals(listOf("Chapter 1"), db.bookmarks().observeForBook("b1").first().map { it.label })
+            val day = db.rewards().getDay(20000)!!
+            assertEquals(420L, day.activeSeconds)
+            assertTrue(day.goalMet)
+            assertEquals(0, day.pages)
+            assertEquals(listOf("first_steps"), db.rewards().earnedBadgeIds())
+            assertEquals(1, db.rewards().countFinished(io.github.dishan18.books.rewards.data.FinishKind.BOOK))
+            assertEquals(420L, db.rewards().observeTotalSeconds().first())
+            assertTrue(db.bookSources().observeAll().first().isEmpty())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun migrate2To3_keepsMangaLibrary() = runTest {
         helper.createDatabase(dbName, 2).apply {
             execSQL(

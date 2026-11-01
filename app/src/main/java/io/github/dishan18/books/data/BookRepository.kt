@@ -2,17 +2,31 @@ package io.github.dishan18.books.data
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.util.Size
+import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import io.github.dishan18.books.widget.ReadingWidget
+import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.coverFitting
 import java.io.File
 import java.util.UUID
+
+/** What a catalog said about a book downloaded from it. */
+data class CatalogInfo(
+    val sourceId: String,
+    val sourceKey: String,
+    val title: String,
+    val author: String?,
+    val subjects: List<String>,
+    val coverUrl: String?,
+)
 
 class BookRepository(
     private val context: Context,
@@ -43,6 +57,8 @@ class BookRepository(
         db.books().delete(book)
         fileOf(book).delete()
         coverOf(book).delete()
+        io.github.dishan18.books.ui.CoverCache.remove(book.id)
+        ReadingWidget.refresh(context)
     }
 
     /** Copies the document at [uri] into app storage and adds it to the library. */
@@ -66,6 +82,57 @@ class BookRepository(
             Result.success(book)
         } catch (e: Exception) {
             file.delete()
+            File(coversDir, "$id.jpg").delete()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun findDownloaded(sourceId: String, sourceKey: String) = db.books().findBySource(sourceId, sourceKey)
+
+    fun observeDownloaded(sourceId: String, sourceKey: String) = db.books().observeBySource(sourceId, sourceKey)
+
+    /**
+     * Adds a book file downloaded from a catalog, moving [file] into the library. Uses the book's
+     * own cover and metadata when it has them, the catalog's otherwise. A book already downloaded
+     * from the same catalog entry is returned instead of being added twice.
+     */
+    suspend fun addDownloaded(
+        file: File,
+        format: BookFormat,
+        info: CatalogInfo,
+        fetchCover: suspend (url: String) -> ByteArray?,
+    ): Result<Book> = withContext(Dispatchers.IO) {
+        db.books().findBySource(info.sourceId, info.sourceKey)?.let {
+            file.delete()
+            return@withContext Result.success(it)
+        }
+        val id = UUID.randomUUID().toString()
+        val target = File(booksDir, "$id.${format.name.lowercase()}")
+        try {
+            if (!file.renameTo(target)) {
+                file.copyTo(target, overwrite = true)
+                file.delete()
+            }
+            var book = when (format) {
+                BookFormat.PDF -> importPdf(id, target, info.title)
+                BookFormat.EPUB -> importEpub(id, target, info.title)
+            }
+            if (!book.hasCover && info.coverUrl != null) {
+                val bytes = runCatching { fetchCover(info.coverUrl) }.getOrNull()
+                val bitmap = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                book = book.copy(hasCover = bitmap != null && saveCover(id, bitmap))
+            }
+            book = book.copy(
+                author = book.author ?: info.author,
+                sourceId = info.sourceId,
+                sourceKey = info.sourceKey,
+                // The catalog's genres are tidier than most EPUBs' own subjects.
+                subjects = info.subjects.ifEmpty { book.subjectList }.distinct().take(12).joinToString("\n"),
+            )
+            db.books().insert(book)
+            Result.success(book)
+        } catch (e: Exception) {
+            target.delete()
             File(coversDir, "$id.jpg").delete()
             Result.failure(e)
         }
@@ -108,10 +175,38 @@ class BookRepository(
                 fileName = file.name,
                 hasCover = cover != null && saveCover(id, cover),
                 addedAt = System.currentTimeMillis(),
+                subjects = subjectsOf(publication),
             )
         } finally {
             publication.close()
         }
+    }
+
+    private fun subjectsOf(publication: Publication): String =
+        publication.metadata.subjects.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct().take(12).joinToString("\n")
+
+    /**
+     * Reads subjects from EPUBs imported before they were kept (pre-v3), once per book, so Year in
+     * Books can show genres from the books' own metadata.
+     */
+    suspend fun backfillSubjects() = withContext(Dispatchers.IO) {
+        val prefs = context.getSharedPreferences("books", Context.MODE_PRIVATE)
+        val checked = prefs.getStringSet("subjectsChecked", emptySet()).orEmpty()
+        val pending = db.books().getAll().filter { it.format == BookFormat.EPUB && it.subjects.isEmpty() && it.id !in checked }
+        if (pending.isEmpty()) return@withContext
+        val done = checked.toMutableSet()
+        pending.forEach { book ->
+            val publication = readium.open(fileOf(book)).getOrNull()
+            if (publication != null) {
+                try {
+                    subjectsOf(publication).takeIf { it.isNotEmpty() }?.let { db.books().setSubjects(book.id, it) }
+                } finally {
+                    publication.close()
+                }
+            }
+            done += book.id
+        }
+        prefs.edit { putStringSet("subjectsChecked", done) }
     }
 
     private fun saveCover(id: String, bitmap: Bitmap): Boolean =

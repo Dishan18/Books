@@ -15,7 +15,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import io.github.dishan18.books.MainActivity
+import io.github.dishan18.books.HomeActivity
 import io.github.dishan18.books.R
 import io.github.dishan18.books.app
 import java.time.Duration
@@ -46,7 +46,7 @@ class ReadingReminderWorker(context: Context, params: WorkerParameters) : Corout
         val open = PendingIntent.getActivity(
             applicationContext,
             1,
-            Intent(applicationContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            Intent(applicationContext, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         NotificationManagerCompat.from(applicationContext).notify(

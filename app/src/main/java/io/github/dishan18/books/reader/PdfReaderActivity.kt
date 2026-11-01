@@ -65,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.dishan18.books.app
+import io.github.dishan18.books.widget.ReadingWidget
 import io.github.dishan18.books.rewards.data.ReadingKind
 import io.github.dishan18.books.rewards.ui.RewardOverlay
 import io.github.dishan18.books.data.PageDirection
@@ -112,6 +113,14 @@ class PdfReaderActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         app.rewards.pause()
+        ReadingWidget.refresh(this)
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            (viewModel.state.value as? PdfReaderViewModel.State.Ready)?.document?.trim(background = level >= TRIM_MEMORY_BACKGROUND)
+        }
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {

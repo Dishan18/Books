@@ -1,0 +1,61 @@
+name: Bug report
+description: Something doesn't work, looks wrong, or feels slow
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report this. Please check that it hasn't been reported already. For security problems, follow SECURITY.md instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the Manga tab
+        2. Tap ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where in the app?
+      options:
+        - Books library / import
+        - PDF reader
+        - EPUB reader
+        - Discover (online books)
+        - Manga tab / sources
+        - Webtoon reader
+        - Downloads
+        - Progress / rewards
+        - Year in Books
+        - Home-screen widget
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: v3.0.0
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and Android version
+      placeholder: Pixel 9, Android 16
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, video or logs
+      description: Anything that helps. Please remove personal details and never include passwords.

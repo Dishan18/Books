@@ -10,7 +10,7 @@ import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import io.github.dishan18.books.MainActivity
+import io.github.dishan18.books.HomeActivity
 import io.github.dishan18.books.R
 
 object MangaNotifications {
@@ -24,7 +24,7 @@ object MangaNotifications {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(DOWNLOADS_CHANNEL, "Downloads", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Progress of chapter downloads"
+                description = "Progress of book and chapter downloads"
                 setShowBadge(false)
             },
         )
@@ -38,7 +38,7 @@ object MangaNotifications {
     fun openApp(context: Context): PendingIntent = PendingIntent.getActivity(
         context,
         0,
-        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        Intent(context, HomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 

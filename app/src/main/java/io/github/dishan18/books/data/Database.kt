@@ -8,6 +8,8 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import io.github.dishan18.books.discover.data.BookSourceDao
+import io.github.dishan18.books.discover.data.BookSourceEntity
 import io.github.dishan18.books.manga.data.DownloadDao
 import io.github.dishan18.books.manga.data.MangaChapter
 import io.github.dishan18.books.manga.data.MangaDao
@@ -42,6 +44,18 @@ interface BookDao {
 
     @Query("UPDATE books SET lastOpenedAt = :time WHERE id = :id")
     suspend fun markOpened(id: String, time: Long)
+
+    @Query("SELECT * FROM books WHERE sourceId = :sourceId AND sourceKey = :sourceKey LIMIT 1")
+    suspend fun findBySource(sourceId: String, sourceKey: String): Book?
+
+    @Query("SELECT * FROM books WHERE sourceId = :sourceId AND sourceKey = :sourceKey LIMIT 1")
+    fun observeBySource(sourceId: String, sourceKey: String): Flow<Book?>
+
+    @Query("SELECT * FROM books")
+    suspend fun getAll(): List<Book>
+
+    @Query("UPDATE books SET subjects = :subjects WHERE id = :id")
+    suspend fun setSubjects(id: String, subjects: String)
 }
 
 @Dao
@@ -69,8 +83,9 @@ interface BookmarkDao {
         ReadingDay::class,
         EarnedBadge::class,
         FinishedItem::class,
+        BookSourceEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class BooksDatabase : RoomDatabase() {
@@ -80,6 +95,7 @@ abstract class BooksDatabase : RoomDatabase() {
     abstract fun manga(): MangaDao
     abstract fun downloads(): DownloadDao
     abstract fun rewards(): RewardsDao
+    abstract fun bookSources(): BookSourceDao
 
     companion object {
         fun create(context: Context): BooksDatabase =

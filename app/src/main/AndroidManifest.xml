@@ -22,13 +22,9 @@
         android:theme="@style/Theme.Books">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".HomeActivity"
             android:exported="true"
             android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
             <!-- "Open with Books" from Files, Drive, Gmail attachments, etc. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -38,6 +34,70 @@
                 <data android:mimeType="application/epub+zip" />
             </intent-filter>
         </activity>
+
+        <!--
+            Launcher entries, one per app icon (level rewards); exactly one is enabled at a time.
+            The classic one keeps the original ".MainActivity" name so home-screen shortcuts made
+            before v3 still work.
+        -->
+        <activity-alias
+            android:name=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherPaper"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_paper"
+            android:roundIcon="@mipmap/ic_launcher_paper"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherBlossom"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_blossom"
+            android:roundIcon="@mipmap/ic_launcher_blossom"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherMidnight"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_midnight"
+            android:roundIcon="@mipmap/ic_launcher_midnight"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherGold"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_gold"
+            android:roundIcon="@mipmap/ic_launcher_gold"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name=".reader.PdfReaderActivity"
@@ -56,6 +116,37 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:exported="false"
             android:theme="@style/Theme.Books.Reader" />
+
+        <activity
+            android:name=".year.YearInBooksActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Books.Year" />
+
+        <!-- Shares the Year in Books card as an image; only files the app writes to cache/share. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- "Reading" home-screen widget. Redrawn on demand; never on a timer. -->
+        <receiver
+            android:name=".widget.ReadingWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/reading_widget_info" />
+        </receiver>
 
         <!-- WorkManager's foreground service runs downloads and library updates. -->
         <service

@@ -16,22 +16,31 @@ import io.github.dishan18.books.rewards.engine.Levels
 import io.github.dishan18.books.rewards.engine.Perks
 import io.github.dishan18.books.rewards.engine.RewardStats
 import io.github.dishan18.books.rewards.engine.Streaks
+import io.github.dishan18.books.widget.ReadingWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -61,7 +70,10 @@ data class ProgressState(
     val level: Int = 1,
     val levelProgress: Float = 0f,
     val earned: List<EarnedBadge> = emptyList(),
-)
+) {
+    /** Level used for unlocks: the highest ever reached, so rewards stay unlocked for good. */
+    val unlockedLevel: Int get() = maxOf(level, prefs.lastLevel)
+}
 
 /**
  * Reading time, daily goals, streaks, badges and levels. Everything stays on the device.
@@ -69,8 +81,9 @@ data class ProgressState(
  * Readers call [resume] / [ping] / [pause]; time counts only while someone is interacting, with
  * gaps capped at [IDLE_CAP_MS] so a book left open doesn't keep counting.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class RewardsRepository(
-    context: Context,
+    private val context: Context,
     private val dao: RewardsDao,
     val settings: RewardsSettings = RewardsSettings(context),
     private val clock: () -> Long = System::currentTimeMillis,
@@ -92,11 +105,20 @@ class RewardsRepository(
     private var sessionSecondsTotal = 0L
     private var lastPing = 0L
     private var pendingMs = 0L
+    private var pendingPages = 0
+    private var sessionPagesTotal = 0
     private var flushJob: Job? = null
     private var lastFreezeCheck = -1L
 
+    // Read from any thread; only throttles how often ping() queues work.
+    @Volatile private var lastPingQueued = 0L
+
+    /** The current local day. Moves on at midnight so streaks and goals roll over while the app is open. */
+    private val _today = MutableStateFlow(today())
+    val currentDay: StateFlow<Long> = _today.asStateFlow()
+
     val progress: StateFlow<ProgressState> = combine(
-        settings.state,
+        combine(settings.state, _today) { prefs, day -> prefs to day },
         dao.observeDays(),
         dao.observeTotalSeconds(),
         dao.observeBadges(),
@@ -104,10 +126,9 @@ class RewardsRepository(
             dao.observeFinishedCount(FinishKind.BOOK),
             dao.observeFinishedCount(FinishKind.CHAPTER),
             dao.observeFinishedCount(FinishKind.SERIES),
-            dao.observeBooksFinishedSince(startOfYear()),
+            _today.map { startOfYear(it) }.distinctUntilChanged().flatMapLatest { dao.observeBooksFinishedSince(it) },
         ) { books, chapters, series, thisYear -> listOf(books, chapters, series, thisYear) },
-    ) { prefs, dayList, totalSeconds, badges, counts ->
-        val now = today()
+    ) { (prefs, now), dayList, totalSeconds, badges, counts ->
         val days = dayList.associateBy { it.day }
         val streak = Streaks.compute(days, now)
         val stats = RewardStats(
@@ -115,7 +136,8 @@ class RewardsRepository(
             booksFinished = counts[0],
             chaptersRead = counts[1],
             seriesCompleted = counts[2],
-            totalMinutes = (totalSeconds / 60).toInt(),
+            // Same source as evaluate(), so the level shown and the rewards unlocked always agree.
+            totalMinutes = (days.values.sumOf { it.activeSeconds } / 60).toInt(),
         )
         val xp = Levels.xp(stats, badges.size)
         ProgressState(
@@ -138,14 +160,44 @@ class RewardsRepository(
     }.stateIn(scope, SharingStarted.Eagerly, ProgressState())
 
     init {
-        scope.launch { applyFreezes() }
+        scope.launch { lock.withLock { applyFreezes() } }
+        // Wake at each local midnight to start the new day. delay() holds no wake lock: if the phone
+        // is asleep it fires late, and refreshDay() on resume covers that.
+        scope.launch {
+            while (isActive) {
+                delay(millisUntilNextDay())
+                refreshDay()
+            }
+        }
     }
 
     /** Level needed for [theme], or null if the reader may use it now. */
     fun lockedLevel(theme: ReaderTheme): Int? {
-        val state = progress.value
-        if (!state.prefs.enabled || Perks.isUnlocked(theme, state.level)) return null
+        if (!settings.value.enabled || Perks.isUnlocked(theme, unlockedLevel())) return null
         return Perks.unlockLevel(theme)
+    }
+
+    /** Highest level reached so far. Unlocks never go away once earned. */
+    fun unlockedLevel(): Int = maxOf(progress.value.level, settings.value.lastLevel)
+
+    /** Re-checks the date (after midnight, a time zone change, or the app coming back). */
+    fun refreshDay() {
+        scope.launch {
+            lock.withLock {
+                val day = today()
+                if (day == _today.value) return@withLock
+                _today.value = day
+                applyFreezes()
+                evaluate()
+            }
+        }
+    }
+
+    private fun millisUntilNextDay(): Long {
+        val zone = ZoneId.systemDefault()
+        val now = Instant.ofEpochMilli(clock()).atZone(zone)
+        val next = now.toLocalDate().plusDays(1).atStartOfDay(zone)
+        return Duration.between(now, next).toMillis().coerceAtLeast(0) + 1_000
     }
 
     // Tracking
@@ -153,6 +205,7 @@ class RewardsRepository(
     /** A reader came to the foreground. [identify] returns (item id, title) once the item is loaded. */
     fun resume(kind: ReadingKind, identify: () -> Pair<String, String>?) {
         val now = clock()
+        refreshDay()
         scope.launch {
             lock.withLock {
                 endSessionLocked()
@@ -164,10 +217,21 @@ class RewardsRepository(
         }
     }
 
-    /** The reader is being used: a touch, page turn or scroll. Cheap to call often. */
+    /**
+     * The reader is being used: a touch, page turn or scroll. Cheap to call on every touch event:
+     * at most one update is queued every [PING_THROTTLE_MS], which loses nothing because time is
+     * measured between updates and [pause] closes the last stretch.
+     */
     fun ping() {
         val now = clock()
+        if (now - lastPingQueued in 0 until PING_THROTTLE_MS) return
+        lastPingQueued = now
         scope.launch { lock.withLock { accumulateLocked(now) } }
+    }
+
+    /** The reader moved forward a page (or a screen of a webtoon). Counted for stats only. */
+    fun pageTurned() {
+        scope.launch { lock.withLock { if (kind != null) pendingPages++ } }
     }
 
     /** The reader left the foreground: count the last stretch and save. */
@@ -196,6 +260,8 @@ class RewardsRepository(
         sessionId = null
         lastPing = 0
         pendingMs = 0
+        pendingPages = 0
+        sessionPagesTotal = 0
     }
 
     private fun startFlushing() {
@@ -212,26 +278,35 @@ class RewardsRepository(
     private suspend fun flushLocked() {
         val currentKind = kind ?: return
         val seconds = pendingMs / 1000
-        if (seconds <= 0) return
+        val pages = pendingPages
+        if (seconds <= 0 && pages <= 0) return
         val (itemId, title) = identify?.invoke() ?: return
         pendingMs -= seconds * 1000
+        pendingPages = 0
         val now = clock()
         val day = today()
         val id = sessionId
         if (id == null) {
             sessionStartedAt = now - seconds * 1000
             sessionSecondsTotal = seconds
+            sessionPagesTotal = pages
             sessionId = dao.insertSession(
-                ReadingSession(kind = currentKind, itemId = itemId, title = title, startedAt = sessionStartedAt, endedAt = now, activeSeconds = seconds, day = day),
+                ReadingSession(
+                    kind = currentKind, itemId = itemId, title = title, startedAt = sessionStartedAt, endedAt = now,
+                    activeSeconds = seconds, day = day, pages = pages,
+                ),
             )
         } else {
             sessionSecondsTotal += seconds
-            dao.updateSession(ReadingSession(id, currentKind, itemId, title, sessionStartedAt, now, sessionSecondsTotal, day))
+            sessionPagesTotal += pages
+            dao.updateSession(ReadingSession(id, currentKind, itemId, title, sessionStartedAt, now, sessionSecondsTotal, day, sessionPagesTotal))
         }
         if (lastFreezeCheck != day) applyFreezes()
         val prefs = settings.value
         val currentHour = hour()
-        val (before, after) = dao.addToDay(day, seconds, prefs.goalSeconds, lateNight = currentHour in 0..3, earlyMorning = currentHour in 5..6)
+        val (before, after) = dao.addToDay(
+            day, seconds, pages, prefs.goalSeconds, lateNight = currentHour in 0..3, earlyMorning = currentHour in 5..6,
+        )
         if (before?.goalMet != true && after.goalMet && prefs.enabled) {
             val streak = Streaks.compute(dao.allDays().associateBy { it.day }, day).current
             _events.tryEmit(RewardEvent.GoalReached(streak))
@@ -249,7 +324,7 @@ class RewardsRepository(
                 val inserted = dao.insertFinished(FinishedItem(FinishKind.BOOK, bookId, title, clock(), today(), pages)) != -1L
                 if (!inserted) return@withLock
                 if (settings.value.enabled) {
-                    val confetti = progress.value.level >= Perks.all.first().level
+                    val confetti = unlockedLevel() >= Perks.all.first().level
                     _events.tryEmit(RewardEvent.BookFinished(title, dao.secondsFor(ReadingKind.BOOK, bookId), pages, confetti))
                 }
                 evaluate()
@@ -274,6 +349,7 @@ class RewardsRepository(
 
     fun setGoalMinutes(minutes: Int) {
         settings.update { it.copy(goalMinutes = minutes) }
+        ReadingWidget.refresh(context)
         // Days already past keep their result; today re-checks against the new goal.
         scope.launch {
             lock.withLock {
@@ -286,7 +362,10 @@ class RewardsRepository(
         }
     }
 
-    fun setEnabled(enabled: Boolean) = settings.update { it.copy(enabled = enabled) }
+    fun setEnabled(enabled: Boolean) {
+        settings.update { it.copy(enabled = enabled) }
+        ReadingWidget.refresh(context)
+    }
 
     fun setVacation(on: Boolean) {
         scope.launch {
@@ -297,6 +376,7 @@ class RewardsRepository(
                     applyFreezes()
                     settings.update { it.copy(vacationSince = null) }
                 }
+                ReadingWidget.refresh(context)
             }
         }
     }
@@ -383,10 +463,11 @@ class RewardsRepository(
         }
     }
 
-    private fun startOfYear(): Long =
-        LocalDate.now().withDayOfYear(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    private fun startOfYear(day: Long): Long =
+        LocalDate.ofEpochDay(day).withDayOfYear(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
     companion object {
+        const val PING_THROTTLE_MS = 2_000L
         /** Longest gap between interactions that still counts as reading (a dense page). */
         const val IDLE_CAP_MS = 2 * 60_000L
         const val FLUSH_INTERVAL_MS = 30_000L

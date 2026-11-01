@@ -31,21 +31,44 @@ object Levels {
     }
 }
 
+/**
+ * Alternative launcher icons. [alias] is the `<activity-alias>` in the manifest; the classic icon
+ * is the original launcher entry, so home-screen shortcuts made before v3 keep working.
+ */
+enum class AppIcon(val alias: String, val title: String) {
+    CLASSIC(".MainActivity", "Classic"),
+    PAPER(".LauncherPaper", "Paper"),
+    BLOSSOM(".LauncherBlossom", "Blossom"),
+    MIDNIGHT(".LauncherMidnight", "Midnight"),
+    GOLD(".LauncherGold", "Gold"),
+}
+
 /** Cosmetic rewards unlocked by level. Rewards never gate features. */
 object Perks {
-    data class Perk(val level: Int, val title: String, val theme: ReaderTheme? = null)
+    data class Perk(val level: Int, val title: String, val theme: ReaderTheme? = null, val icon: AppIcon? = null)
 
     val all = listOf(
         Perk(2, "Confetti when you finish a book"),
-        Perk(3, "Midnight reading theme", ReaderTheme.MIDNIGHT),
-        Perk(5, "Forest reading theme", ReaderTheme.FOREST),
-        Perk(8, "True black (AMOLED) theme", ReaderTheme.AMOLED),
-        Perk(12, "Golden streak flame"),
+        Perk(3, "Midnight reading theme", theme = ReaderTheme.MIDNIGHT),
+        Perk(4, "Pink reading theme", theme = ReaderTheme.PINK),
+        Perk(5, "Forest reading theme", theme = ReaderTheme.FOREST),
+        Perk(6, "Paper app icon", icon = AppIcon.PAPER),
+        Perk(7, "Blossom app icon", icon = AppIcon.BLOSSOM),
+        Perk(8, "True black (AMOLED) theme", theme = ReaderTheme.AMOLED),
+        Perk(10, "Midnight app icon", icon = AppIcon.MIDNIGHT),
+        Perk(12, "Golden streak flame and Gold app icon", icon = AppIcon.GOLD),
     )
 
     fun unlockLevel(theme: ReaderTheme): Int = all.firstOrNull { it.theme == theme }?.level ?: 1
 
     fun isUnlocked(theme: ReaderTheme, level: Int) = level >= unlockLevel(theme)
+
+    fun unlockLevel(icon: AppIcon): Int = all.firstOrNull { it.icon == icon }?.level ?: 1
+
+    fun isUnlocked(icon: AppIcon, level: Int) = level >= unlockLevel(icon)
+
+    /** Level of the golden streak flame. */
+    const val GOLDEN_FLAME_LEVEL = 12
 
     fun newlyUnlocked(oldLevel: Int, newLevel: Int): List<Perk> = all.filter { it.level in (oldLevel + 1)..newLevel }
 }

@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -38,10 +39,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
@@ -54,6 +57,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -88,7 +93,13 @@ import kotlin.math.roundToInt
 private val BookMimeTypes = arrayOf("application/pdf", "application/epub+zip")
 
 @Composable
-fun LibraryScreen(viewModel: LibraryViewModel, onOpen: (Book, Rect) -> Unit) {
+fun LibraryScreen(
+    viewModel: LibraryViewModel,
+    onOpen: (Book, Rect) -> Unit,
+    onDiscover: () -> Unit,
+    gridState: LazyGridState = rememberLazyGridState(),
+    topBarState: TopAppBarState = rememberTopAppBarState(),
+) {
     val books by viewModel.books.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -101,8 +112,7 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpen: (Book, Rect) -> Unit) {
         viewModel.messages.collect { snackbar.showSnackbar(it) }
     }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val gridState = rememberLazyGridState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     val fabExpanded by remember { derivedStateOf { gridState.firstVisibleItemIndex == 0 } }
     var selected by remember { mutableStateOf<Book?>(null) }
 
@@ -112,6 +122,11 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpen: (Book, Rect) -> Unit) {
         topBar = {
             LargeTopAppBar(
                 title = { Text("Library") },
+                actions = {
+                    IconButton(onClick = onDiscover) {
+                        Icon(Icons.Outlined.TravelExplore, contentDescription = "Find free books online")
+                    }
+                },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -135,7 +150,7 @@ fun LibraryScreen(viewModel: LibraryViewModel, onOpen: (Book, Rect) -> Unit) {
             val list = books
             when {
                 list == null -> Unit
-                list.isEmpty() -> EmptyLibrary(onAdd = addBooks, modifier = Modifier.padding(padding))
+                list.isEmpty() -> EmptyLibrary(onAdd = addBooks, onDiscover = onDiscover, modifier = Modifier.padding(padding))
                 else -> LibraryGrid(
                     books = list,
                     state = gridState,
@@ -313,7 +328,7 @@ private fun ContinueReadingCard(book: Book, onOpen: (Rect) -> Unit, modifier: Mo
 }
 
 @Composable
-private fun EmptyLibrary(onAdd: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyLibrary(onAdd: () -> Unit, onDiscover: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier
             .fillMaxSize()
@@ -351,6 +366,8 @@ private fun EmptyLibrary(onAdd: () -> Unit, modifier: Modifier = Modifier) {
             Spacer(Modifier.width(8.dp))
             Text("Add books")
         }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onDiscover) { Text("Find free books online") }
     }
 }
 
