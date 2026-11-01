@@ -18,7 +18,9 @@ Tap the middle of a page to show or hide the controls.
 
 ## Install on your phone
 
-**From GitHub Actions:** every push to `main` builds an APK. Open the latest run under *Actions → Build APK*, download the `Books-apk` artifact, unzip it and open the `.apk` on your phone (allow installs from your browser or Files app when asked).
+**From GitHub Releases (easiest):** on your phone, open the [latest release](https://github.com/Dishan18/Books/releases/latest) and tap `Books-vX.Y.Z.apk`. Open the download and tap **Install** (allow installs from your browser when asked). No GitHub account needed.
+
+To update, install the newer APK the same way; it replaces the old version and keeps your books.
 
 **From your computer:** turn on *Developer options → USB debugging* on the phone, plug it in, then run:
 
@@ -26,7 +28,27 @@ Tap the middle of a page to show or hide the controls.
 ./gradlew installRelease
 ```
 
-The release build is signed with the local debug key so it installs without extra setup. APKs built on different machines (your PC vs. GitHub Actions) have different keys, so Android will ask you to uninstall one before installing the other. Uninstalling also deletes your imported books.
+## Signing
+
+Every build is signed with one key, so APKs from your PC and from GitHub install over each other. The key never goes into git:
+
+- **Locally** it lives in `app/signing/` (`books.jks` plus `keystore.properties` with its password), which is git-ignored. Back this folder up somewhere safe: if you lose it, future builds can't update the installed app.
+- **On GitHub** it comes from two repository secrets (*Settings → Secrets and variables → Actions*):
+  - `BOOKS_KEYSTORE_BASE64`: the contents of `app/signing/books.jks.base64.txt`
+  - `BOOKS_KEYSTORE_PASSWORD`: the `storePassword` value from `app/signing/keystore.properties`
+
+Without a key (for example in a fork) builds fall back to the debug key.
+
+## Publishing a release
+
+Tag a commit and push the tag; GitHub Actions builds the APK and attaches it to a new release:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+The version number comes from the tag, so each new tag must be higher than the last.
 
 ## Build requirements
 

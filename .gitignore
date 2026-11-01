@@ -13,3 +13,5 @@
 *.aab
 *.keystore
 *.jks
+# Signing key and its password stay on your machine; CI gets them from repository secrets.
+/app/signing/

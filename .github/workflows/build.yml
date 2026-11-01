@@ -19,6 +19,17 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Signs with your key when the secrets exist (not on forks' pull requests); otherwise the debug key.
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BOOKS_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.BOOKS_KEYSTORE_PASSWORD }}
+        run: |
+          [ -z "$KEYSTORE_BASE64" ] && exit 0
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/books.jks"
+          echo "BOOKS_KEYSTORE_FILE=$RUNNER_TEMP/books.jks" >> "$GITHUB_ENV"
+          echo "BOOKS_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Build release APK
         run: ./gradlew --console=plain :app:assembleRelease
 
