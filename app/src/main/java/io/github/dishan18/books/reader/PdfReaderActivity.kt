@@ -1,6 +1,7 @@
 package io.github.dishan18.books.reader
 
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
@@ -63,6 +65,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.dishan18.books.app
+import io.github.dishan18.books.rewards.data.ReadingKind
+import io.github.dishan18.books.rewards.ui.RewardOverlay
 import io.github.dishan18.books.data.PageDirection
 import io.github.dishan18.books.data.ReaderSettingsStore
 import io.github.dishan18.books.data.ReaderTheme
@@ -76,7 +80,7 @@ class PdfReaderActivity : ComponentActivity() {
 
     private val viewModel: PdfReaderViewModel by viewModels {
         viewModelFactory {
-            initializer { PdfReaderViewModel(intent.getStringExtra(EXTRA_BOOK_ID).orEmpty(), app.repository) }
+            initializer { PdfReaderViewModel(intent.getStringExtra(EXTRA_BOOK_ID).orEmpty(), app.repository, app.rewards) }
         }
     }
 
@@ -95,6 +99,24 @@ class PdfReaderActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    // Reading time for streaks: counts while the reader is in front and being touched.
+    override fun onResume() {
+        super.onResume()
+        app.rewards.resume(ReadingKind.BOOK) {
+            (viewModel.state.value as? PdfReaderViewModel.State.Ready)?.book?.let { it.id to it.title }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        app.rewards.pause()
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        app.rewards.ping()
+        return super.dispatchTouchEvent(event)
     }
 }
 
@@ -125,6 +147,7 @@ private fun PdfReaderScreen(
             is PdfReaderViewModel.State.Ready ->
                 PdfReader(s, viewModel, settingsStore, theme, settings.pageDirection, onClose, onWindowChange)
         }
+        RewardOverlay()
     }
 }
 
@@ -257,6 +280,7 @@ private fun PdfReader(
             pageDirection = pageDirection,
             onPageDirectionChange = settingsStore::setPageDirection,
             onDismiss = { sheet = null },
+            lockedThemeLevel = LocalContext.current.app.rewards::lockedLevel,
         )
         PdfSheet.Bookmarks -> BookmarksSheet(
             theme = theme,
@@ -314,6 +338,27 @@ private fun pageFilter(theme: ReaderTheme): ColorFilter? = when (theme) {
     ReaderTheme.SEPIA -> sepiaPageFilter
     ReaderTheme.PINK -> pinkPageFilter
     ReaderTheme.DARK -> darkPageFilter
+    ReaderTheme.MIDNIGHT, ReaderTheme.FOREST, ReaderTheme.AMOLED -> themeFilters.getOrPut(theme) { paperAndInkFilter(theme) }
+}
+
+private val themeFilters = mutableMapOf<ReaderTheme, ColorFilter>()
+
+/**
+ * Maps white paper to the theme's background and black ink to its text colour, channel by channel,
+ * so any theme (light or dark) can recolour a PDF page.
+ */
+private fun paperAndInkFilter(theme: ReaderTheme): ColorFilter {
+    fun row(paper: Float, ink: Float, channel: Int) = FloatArray(5).also {
+        it[channel] = paper - ink
+        it[4] = ink * 255f
+    }
+    val bg = theme.background
+    val fg = theme.content
+    return ColorFilter.colorMatrix(
+        ColorMatrix(
+            row(bg.red, fg.red, 0) + row(bg.green, fg.green, 1) + row(bg.blue, fg.blue, 2) + floatArrayOf(0f, 0f, 0f, 1f, 0f),
+        ),
+    )
 }
 
 private const val MAX_ZOOM = 5f

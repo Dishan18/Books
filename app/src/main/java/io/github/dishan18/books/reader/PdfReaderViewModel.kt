@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.dishan18.books.data.Book
 import io.github.dishan18.books.data.BookRepository
 import io.github.dishan18.books.data.Bookmark
+import io.github.dishan18.books.rewards.RewardsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,6 +17,7 @@ import kotlinx.coroutines.withContext
 class PdfReaderViewModel(
     private val bookId: String,
     private val repository: BookRepository,
+    private val rewards: RewardsRepository,
 ) : ViewModel() {
 
     sealed interface State {
@@ -48,9 +50,17 @@ class PdfReaderViewModel(
         }
     }
 
+    private var firstSettle = true
+
     fun onPageSettled(page: Int, pageCount: Int) {
         viewModelScope.launch {
             repository.saveLocation(bookId, page.toString(), progressOf(page, pageCount))
+        }
+        // Turning onto the last page finishes the book (reopening one already there doesn't).
+        val opened = firstSettle
+        firstSettle = false
+        if (!opened && pageCount > 0 && page == pageCount - 1) {
+            (state.value as? State.Ready)?.let { rewards.onBookFinished(bookId, it.book.title, pageCount) }
         }
     }
 

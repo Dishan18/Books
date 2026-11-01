@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import io.github.dishan18.books.manga.MangaModule
 import io.github.dishan18.books.manga.data.MangaChapter
 import io.github.dishan18.books.manga.data.MangaSeries
+import io.github.dishan18.books.manga.data.SeriesStatus
+import io.github.dishan18.books.rewards.RewardsRepository
 import io.github.dishan18.books.manga.source.api.runSource
 import io.github.dishan18.books.manga.source.api.sourceError
 import kotlinx.coroutines.Dispatchers
@@ -90,7 +92,11 @@ data class ScrollTarget(val chapterId: Long, val page: Int, val fraction: Float)
 data class ReaderPosition(val chapter: MangaChapter, val page: Int, val pageCount: Int, val fraction: Float)
 
 @OptIn(FlowPreview::class)
-class WebtoonViewModel(private val module: MangaModule, private val initialChapterId: Long) : ViewModel() {
+class WebtoonViewModel(
+    private val module: MangaModule,
+    private val initialChapterId: Long,
+    private val rewards: RewardsRepository,
+) : ViewModel() {
     private val repository = module.repository
     private val loader = PageLoader(module.sources, module.downloads.storage, File(module.app.cacheDir, "manga-pages"))
     val decoder = StripDecoder()
@@ -371,7 +377,13 @@ class WebtoonViewModel(private val module: MangaModule, private val initialChapt
 
     private fun markRead(chapter: ReaderChapter) {
         if (!markedRead.add(chapter.chapter.id)) return
-        viewModelScope.launch { repository.setRead(listOf(chapter.chapter.id), true) }
+        viewModelScope.launch {
+            repository.setRead(listOf(chapter.chapter.id), true)
+            // Chapters read here (not ones ticked off in a list) count towards badges.
+            val series = _series.value ?: return@launch
+            val allRead = repository.getChapters(series.id).all { it.read }
+            rewards.onChaptersRead(series.id, series.title, listOf(chapter.chapter.id), seriesCompleted = allRead && series.status == SeriesStatus.COMPLETED)
+        }
     }
 
     private suspend fun save(position: ReaderPosition) {

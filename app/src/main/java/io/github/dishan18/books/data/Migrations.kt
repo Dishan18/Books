@@ -61,4 +61,32 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2)
+/** v2 → v3: adds reading-rewards tables (sessions, daily totals, badges, finished items). Additive. */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `reading_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`kind` TEXT NOT NULL, `itemId` TEXT NOT NULL, `title` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, " +
+                "`endedAt` INTEGER NOT NULL, `activeSeconds` INTEGER NOT NULL, `day` INTEGER NOT NULL)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_reading_sessions_day` ON `reading_sessions` (`day`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_reading_sessions_kind_itemId` ON `reading_sessions` (`kind`, `itemId`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `reading_days` (`day` INTEGER NOT NULL, `activeSeconds` INTEGER NOT NULL, " +
+                "`goalMet` INTEGER NOT NULL, `frozen` INTEGER NOT NULL, `lateNight` INTEGER NOT NULL, " +
+                "`earlyMorning` INTEGER NOT NULL, PRIMARY KEY(`day`))",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `earned_badges` (`badgeId` TEXT NOT NULL, `earnedAt` INTEGER NOT NULL, " +
+                "`seen` INTEGER NOT NULL, PRIMARY KEY(`badgeId`))",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `finished_items` (`kind` TEXT NOT NULL, `itemId` TEXT NOT NULL, " +
+                "`title` TEXT NOT NULL, `finishedAt` INTEGER NOT NULL, `day` INTEGER NOT NULL, `pages` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`kind`, `itemId`))",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_finished_items_day` ON `finished_items` (`day`)")
+    }
+}
+
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)

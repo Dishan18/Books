@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.dishan18.books.rewards.ui.RewardOverlay
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -216,6 +217,7 @@ fun WebtoonReaderScreen(viewModel: WebtoonViewModel, onBack: () -> Unit, onChrom
                 scope.launch { viewModel.nextChapter()?.let(viewModel::openChapter) }
             },
         )
+        RewardOverlay()
     }
 }
 

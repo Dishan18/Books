@@ -3,6 +3,7 @@ package io.github.dishan18.books.reader
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
 import android.widget.Toast
@@ -34,6 +35,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.dishan18.books.R
 import io.github.dishan18.books.app
+import io.github.dishan18.books.rewards.data.ReadingKind
+import io.github.dishan18.books.rewards.ui.RewardOverlay
 import io.github.dishan18.books.data.Book
 import io.github.dishan18.books.data.Bookmark
 import io.github.dishan18.books.data.PageDirection
@@ -111,6 +114,22 @@ class EpubReaderActivity : AppCompatActivity() {
         publication?.close()
     }
 
+    // Reading time for streaks: counts while the reader is in front and being touched.
+    override fun onResume() {
+        super.onResume()
+        app.rewards.resume(ReadingKind.BOOK) { book?.let { it.id to it.title } }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        app.rewards.pause()
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        app.rewards.ping()
+        return super.dispatchTouchEvent(event)
+    }
+
     private suspend fun open() {
         val book = repository.get(bookId) ?: run {
             error = "This book is no longer in your library."
@@ -172,6 +191,7 @@ class EpubReaderActivity : AppCompatActivity() {
     private fun onLocatorChanged(newLocator: Locator) {
         locator = newLocator
         currentPosition = ((newLocator.locations.position ?: 1) - 1).coerceIn(0, (positions.size - 1).coerceAtLeast(0))
+        checkFinished(newLocator)
         lifecycleScope.launch {
             repository.saveLocation(
                 bookId,
@@ -179,6 +199,20 @@ class EpubReaderActivity : AppCompatActivity() {
                 newLocator.locations.totalProgression?.toFloat() ?: 0f,
             )
         }
+    }
+
+    private var openedAt: Locator? = null
+
+    /** Reaching the end counts as finishing the book; reopening a book already at its end doesn't. */
+    private fun checkFinished(current: Locator) {
+        val opened = openedAt ?: run {
+            openedAt = current
+            return
+        }
+        if (opened.locations == current.locations || positions.isEmpty()) return
+        val atEnd = (current.locations.position ?: 0) >= positions.size || (current.locations.totalProgression ?: 0.0) >= 0.99
+        val finished = book ?: return
+        if (atEnd) app.rewards.onBookFinished(finished.id, finished.title, positions.size)
     }
 
     /** Edge taps turn pages; any other tap shows or hides the chrome. */
@@ -282,6 +316,7 @@ class EpubReaderActivity : AppCompatActivity() {
                 onDismiss = { sheet = null },
                 fontScale = settings.fontScale,
                 onFontScaleChange = settingsStore::setFontScale,
+                lockedThemeLevel = app.rewards::lockedLevel,
             )
             Sheet.Bookmarks -> BookmarksSheet(
                 theme = theme,
@@ -303,6 +338,7 @@ class EpubReaderActivity : AppCompatActivity() {
             )
             null -> Unit
         }
+        RewardOverlay()
     }
 
     private companion object {
@@ -313,7 +349,8 @@ class EpubReaderActivity : AppCompatActivity() {
                 // Readium has no pink theme; its light theme plus our colours below gives the same look.
                 ReaderTheme.LIGHT, ReaderTheme.PINK -> Theme.LIGHT
                 ReaderTheme.SEPIA -> Theme.SEPIA
-                ReaderTheme.DARK -> Theme.DARK
+                ReaderTheme.DARK, ReaderTheme.MIDNIGHT, ReaderTheme.AMOLED -> Theme.DARK
+                ReaderTheme.FOREST -> Theme.LIGHT
             },
             // Match the PDF reader and the chrome rather than Readium's own palette.
             backgroundColor = Color(settings.theme.background.toArgb()),

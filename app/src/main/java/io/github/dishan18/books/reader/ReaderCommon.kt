@@ -26,8 +26,8 @@ fun readerIntent(context: Context, book: Book): Intent {
 fun Activity.applyReaderWindow(theme: ReaderTheme, chromeVisible: Boolean) {
     window.setBackgroundDrawable(ColorDrawable(theme.background.toArgb()))
     WindowCompat.getInsetsController(window, window.decorView).apply {
-        isAppearanceLightStatusBars = theme != ReaderTheme.DARK
-        isAppearanceLightNavigationBars = theme != ReaderTheme.DARK
+        isAppearanceLightStatusBars = !theme.isDark
+        isAppearanceLightNavigationBars = !theme.isDark
         systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (chromeVisible) show(WindowInsetsCompat.Type.systemBars()) else hide(WindowInsetsCompat.Type.systemBars())
     }

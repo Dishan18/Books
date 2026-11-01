@@ -11,6 +11,9 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
@@ -254,6 +257,11 @@ private fun SheetTitle(text: String) {
     )
 }
 
+private fun ReaderTheme.label() = when (this) {
+    ReaderTheme.AMOLED -> "True black"
+    else -> name.lowercase().replaceFirstChar { it.uppercase() }
+}
+
 /** Theme picker, plus text size for EPUBs (PDF pages have a fixed layout). */
 @Composable
 fun ReaderSettingsSheet(
@@ -264,6 +272,8 @@ fun ReaderSettingsSheet(
     onDismiss: () -> Unit,
     fontScale: Double? = null,
     onFontScaleChange: ((Double) -> Unit)? = null,
+    /** Level needed to use a theme, or null if it's available. */
+    lockedThemeLevel: (ReaderTheme) -> Int? = { null },
 ) {
     ReaderSheet(theme, onDismiss) {
         SheetTitle("Themes & Settings")
@@ -294,12 +304,14 @@ fun ReaderSettingsSheet(
             }
             Spacer(Modifier.height(20.dp))
         }
+        var lockedHint by remember { mutableStateOf<String?>(null) }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ReaderTheme.entries.forEach { option ->
                 val ring by animateDpAsState(if (option == theme) 3.dp else 1.dp, label = "ring")
+                val unlockLevel = lockedThemeLevel(option)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         Modifier
@@ -311,18 +323,37 @@ fun ReaderSettingsSheet(
                                 if (option == theme) Color(0xFF0A84FF) else theme.content.copy(alpha = 0.2f),
                                 CircleShape,
                             )
-                            .clickable { onThemeChange(option) },
+                            .clickable {
+                                if (unlockLevel == null) {
+                                    onThemeChange(option)
+                                } else {
+                                    lockedHint = "Reach level $unlockLevel by reading to unlock ${option.label()}"
+                                }
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("Aa", color = option.content, fontFamily = FontFamily.Serif, fontSize = 20.sp)
+                        if (unlockLevel == null) {
+                            Text("Aa", color = option.content, fontFamily = FontFamily.Serif, fontSize = 20.sp)
+                        } else {
+                            Icon(Icons.Outlined.Lock, contentDescription = "Locked", tint = option.content.copy(alpha = 0.7f))
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        option.name.lowercase().replaceFirstChar { it.uppercase() },
+                        if (unlockLevel == null) option.label() else "Level $unlockLevel",
                         style = MaterialTheme.typography.labelMedium,
+                        color = if (unlockLevel == null) LocalContentColor.current else theme.content.copy(alpha = 0.5f),
                     )
                 }
             }
+        }
+        lockedHint?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = theme.content.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
         }
         Spacer(Modifier.height(24.dp))
         Text(

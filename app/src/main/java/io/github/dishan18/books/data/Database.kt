@@ -16,6 +16,11 @@ import io.github.dishan18.books.manga.data.MangaHistory
 import io.github.dishan18.books.manga.data.MangaSeries
 import io.github.dishan18.books.manga.data.SourceConfigDao
 import io.github.dishan18.books.manga.data.SourceConfigEntity
+import io.github.dishan18.books.rewards.data.EarnedBadge
+import io.github.dishan18.books.rewards.data.FinishedItem
+import io.github.dishan18.books.rewards.data.ReadingDay
+import io.github.dishan18.books.rewards.data.ReadingSession
+import io.github.dishan18.books.rewards.data.RewardsDao
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -60,8 +65,12 @@ interface BookmarkDao {
         MangaChapter::class,
         MangaHistory::class,
         MangaDownload::class,
+        ReadingSession::class,
+        ReadingDay::class,
+        EarnedBadge::class,
+        FinishedItem::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class BooksDatabase : RoomDatabase() {
@@ -70,6 +79,7 @@ abstract class BooksDatabase : RoomDatabase() {
     abstract fun sources(): SourceConfigDao
     abstract fun manga(): MangaDao
     abstract fun downloads(): DownloadDao
+    abstract fun rewards(): RewardsDao
 
     companion object {
         fun create(context: Context): BooksDatabase =

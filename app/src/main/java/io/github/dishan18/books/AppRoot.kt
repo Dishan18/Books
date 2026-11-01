@@ -12,7 +12,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -27,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -35,10 +41,12 @@ import io.github.dishan18.books.library.LibraryScreen
 import io.github.dishan18.books.library.LibraryViewModel
 import io.github.dishan18.books.manga.ui.MangaHomeRoute
 import io.github.dishan18.books.manga.ui.MangaNavHost
+import io.github.dishan18.books.rewards.ui.ProgressScreen
 
 enum class AppTab(val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
     BOOKS("Books", Icons.AutoMirrored.Outlined.MenuBook, Icons.AutoMirrored.Filled.MenuBook),
     MANGA("Manga", Icons.Outlined.AutoStories, Icons.Filled.AutoStories),
+    PROGRESS("Progress", Icons.Outlined.LocalFireDepartment, Icons.Filled.LocalFireDepartment),
 }
 
 /**
@@ -51,8 +59,10 @@ fun AppRoot(libraryViewModel: LibraryViewModel, onOpenBook: (Book, Rect) -> Unit
     val mangaNav = rememberNavController()
     val mangaEntry by mangaNav.currentBackStackEntryAsState()
     val mangaAtRoot = mangaEntry?.destination?.hasRoute<MangaHomeRoute>() ?: true
-    val showBar = tab == AppTab.BOOKS || mangaAtRoot
+    val showBar = tab != AppTab.MANGA || mangaAtRoot
     val tabStates = rememberSaveableStateHolder()
+    val progress by LocalContext.current.app.rewards.progress.collectAsStateWithLifecycle()
+    val newBadge = progress.prefs.enabled && progress.earned.any { !it.seen }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -63,7 +73,11 @@ fun AppRoot(libraryViewModel: LibraryViewModel, onOpenBook: (Book, Rect) -> Unit
                         NavigationBarItem(
                             selected = tab == item,
                             onClick = { tab = item },
-                            icon = { Icon(if (tab == item) item.selectedIcon else item.icon, contentDescription = null) },
+                            icon = {
+                                BadgedBox(badge = { if (item == AppTab.PROGRESS && newBadge) Badge() }) {
+                                    Icon(if (tab == item) item.selectedIcon else item.icon, contentDescription = null)
+                                }
+                            },
                             label = { Text(item.label) },
                         )
                     }
@@ -76,6 +90,7 @@ fun AppRoot(libraryViewModel: LibraryViewModel, onOpenBook: (Book, Rect) -> Unit
                 when (tab) {
                     AppTab.BOOKS -> LibraryScreen(libraryViewModel, onOpen = onOpenBook)
                     AppTab.MANGA -> MangaNavHost(mangaNav)
+                    AppTab.PROGRESS -> ProgressScreen()
                 }
             }
         }

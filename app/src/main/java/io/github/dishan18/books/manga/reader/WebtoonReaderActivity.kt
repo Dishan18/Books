@@ -13,6 +13,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.dishan18.books.app
 import io.github.dishan18.books.data.ReaderTheme
+import io.github.dishan18.books.rewards.data.ReadingKind
 import io.github.dishan18.books.reader.applyReaderWindow
 import io.github.dishan18.books.ui.theme.BooksTheme
 
@@ -20,7 +21,7 @@ import io.github.dishan18.books.ui.theme.BooksTheme
 class WebtoonReaderActivity : ComponentActivity() {
 
     private val viewModel: WebtoonViewModel by viewModels {
-        viewModelFactory { initializer { WebtoonViewModel(app.manga, intent.getLongExtra(EXTRA_CHAPTER_ID, -1)) } }
+        viewModelFactory { initializer { WebtoonViewModel(app.manga, intent.getLongExtra(EXTRA_CHAPTER_ID, -1), app.rewards) } }
     }
 
     private val screenAwake = ScreenAwake(this)
@@ -43,20 +44,24 @@ class WebtoonReaderActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         screenAwake.poke()
+        app.rewards.resume(ReadingKind.MANGA) { viewModel.series.value?.let { it.id.toString() to it.title } }
     }
 
     override fun onPause() {
         super.onPause()
         screenAwake.stop()
+        app.rewards.pause()
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         screenAwake.poke()
+        app.rewards.ping()
         return super.dispatchTouchEvent(event)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         screenAwake.poke()
+        app.rewards.ping()
         return super.dispatchKeyEvent(event)
     }
 

@@ -7,11 +7,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class ReaderTheme(val background: Color, val content: Color, val chrome: Color) {
+enum class ReaderTheme(val background: Color, val content: Color, val chrome: Color, val isDark: Boolean = false) {
     LIGHT(background = Color(0xFFFFFFFF), content = Color(0xFF1C1C1E), chrome = Color(0xFFF7F7F7)),
     SEPIA(background = Color(0xFFF6EEDC), content = Color(0xFF5B4636), chrome = Color(0xFFEFE5CF)),
     PINK(background = Color(0xFFFCEEF2), content = Color(0xFF5A3443), chrome = Color(0xFFF6E1E8)),
-    DARK(background = Color(0xFF121212), content = Color(0xFFE2E2E2), chrome = Color(0xFF1E1E1E)),
+    DARK(background = Color(0xFF121212), content = Color(0xFFE2E2E2), chrome = Color(0xFF1E1E1E), isDark = true),
+
+    // Unlocked by reading (see rewards Perks).
+    MIDNIGHT(background = Color(0xFF0F1A2E), content = Color(0xFFD6E2F5), chrome = Color(0xFF16233B), isDark = true),
+    FOREST(background = Color(0xFFE8F0E4), content = Color(0xFF2F4A32), chrome = Color(0xFFDCE7D6)),
+    AMOLED(background = Color(0xFF000000), content = Color(0xFFCFCFCF), chrome = Color(0xFF0A0A0A), isDark = true),
 }
 
 /** Which way pages move. Only one direction is active at a time. */

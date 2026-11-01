@@ -40,6 +40,19 @@ Tap the middle of a page to show or hide the controls.
 - With Battery Saver on, fewer pages are loaded ahead.
 - Background work goes through WorkManager with network constraints, so there are no wake locks or polling. Automatic library checks also wait until the battery isn't low.
 
+## Progress tab: streaks and rewards
+
+Reading 5 minutes a day builds a streak, Duolingo-style, but without the guilt.
+
+- **Daily goal**: 1 to 60 minutes (default 5). Books and manga both count. Only real reading counts: time stops after 2 minutes without touching the page.
+- **Streak** 🔥 for every day you hit your goal. Every 7 days earns a **streak freeze** 🧊 (hold up to 2) that automatically covers a missed day. **Vacation mode** pauses your streak.
+- **25 badges**: finishing books (1, 5, 10, 25, 50), streaks (3 to 365 days), a perfect week, a 500-page doorstopper, 10 manga chapters in a day, a completed series, night owl, early bird, weekend warrior, and a few secret ones.
+- **XP and levels** from minutes read, chapters, finished books, goals and badges. Levels unlock cosmetic rewards: confetti when you finish a book, then the **Midnight**, **Forest** and **True black** reading themes, and a golden streak flame.
+- A **celebration card** when you finish a book, and small toasts for goals, badges and level-ups while you read.
+- **Stats**: an 18-week reading heatmap, total time, books this year, chapters read and your best streak.
+- An optional **daily reminder** at a time you pick, sent only if you haven't read yet that day.
+- One switch turns streaks, badges and reminders off, leaving plain stats. Everything stays on your phone: no accounts, no leaderboards.
+
 ## Install on your phone
 
 **From GitHub Releases (easiest):** on your phone, open the [latest release](https://github.com/Dishan18/Books/releases/latest) and tap `Books-vX.Y.Z.apk`. Open the download and tap **Install** (allow installs from your browser when asked). No GitHub account needed.
@@ -68,8 +81,8 @@ Without a key (for example in a fork) builds fall back to the debug key.
 Tag a commit and push the tag; GitHub Actions builds the APK and attaches it to a new release:
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+git tag v2.1.0
+git push origin v2.1.0
 ```
 
 The version number comes from the tag, so each new tag must be higher than the last.
@@ -98,6 +111,7 @@ app/src/main/java/io/github/dishan18/books/
 │   ├── download/            Download queue, worker, library updates, notifications
 │   ├── reader/              Webtoon reader: page loading, strip planning, region decoding
 │   └── ui/                  Library, history, browse, catalog, search, series, sources screens
+├── rewards/                 Reading time, streaks, badges, levels, reminders, Progress tab
 └── ui/                      Theme, covers, shared components
 ```
 

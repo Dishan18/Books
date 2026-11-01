@@ -36,8 +36,9 @@ class MigrationTest {
             close()
         }
 
-        // Validates the migrated schema against the exported v2 schema.
+        // Validates each step against the exported schema of that version.
         helper.runMigrationsAndValidate(dbName, 2, true, MIGRATION_1_2).close()
+        helper.runMigrationsAndValidate(dbName, 3, true, MIGRATION_2_3).close()
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.databaseBuilder(context, BooksDatabase::class.java, dbName)
@@ -52,6 +53,35 @@ class MigrationTest {
             val bookmarks = db.bookmarks().observeForBook("b1").first()
             assertEquals(listOf("Page 4"), bookmarks.map { it.label })
             assertTrue(db.manga().getFavorites().isEmpty())
+            assertTrue(db.rewards().allDays().isEmpty())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun migrate2To3_keepsMangaLibrary() = runTest {
+        helper.createDatabase(dbName, 2).apply {
+            execSQL(
+                "INSERT INTO manga_series (id, sourceId, sourceKey, title, status, genres, favorite, createdAt) " +
+                    "VALUES (1, 'mangadex', 'm1', 'A Webtoon', 'ONGOING', '', 1, 10)",
+            )
+            execSQL(
+                "INSERT INTO manga_chapters (id, seriesId, sourceKey, name, sortIndex, read, lastPageRead, pageOffset, addedAt) " +
+                    "VALUES (5, 1, 'c1', 'Ch. 1', 0, 1, 12, 0.5, 10)",
+            )
+            close()
+        }
+        helper.runMigrationsAndValidate(dbName, 3, true, MIGRATION_2_3).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.databaseBuilder(context, BooksDatabase::class.java, dbName).addMigrations(*ALL_MIGRATIONS).build()
+        try {
+            val favorites = db.manga().getFavorites()
+            assertEquals(listOf("A Webtoon"), favorites.map { it.title })
+            val chapter = db.manga().getChapter(5)!!
+            assertTrue(chapter.read)
+            assertEquals(12, chapter.lastPageRead)
         } finally {
             db.close()
         }
