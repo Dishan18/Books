@@ -58,6 +58,14 @@ To update, install the newer APK the same way; it replaces the old version and k
 
 Every book reopens exactly where you left off.
 
+## Excel and PowerPoint files
+
+Books opens Excel (`.xlsx`) and PowerPoint (`.pptx`, `.ppsx`) files, so you don't need another app just to look at one. In Files, Drive or Gmail, tap the file and choose **Books** (or use **Share → Books**). It's added to your library like a PDF. Old `.xls` and `.ppt` files and password-protected files aren't supported.
+
+**Spreadsheets**: drag to scroll, pinch to zoom, and tap the sheet names at the bottom to switch sheets. Tap a cell to see its full value, which you can select and copy (handy when a narrow column shows `####`). Values look as they do in Excel: dates, currencies, percentages, colours, merged cells and frozen header rows. Formulas show their last saved result. Spreadsheets are only for looking: they never count as reading, and never appear in *Continue reading*, on the widget or in Year in Books.
+
+**Slides** read like PDF pages: swipe or tap the edges to move between slides, pinch to zoom, and bookmark slides. Slides keep their own colours in every theme. Time spent and slides turned count toward your daily goal and streak, but slides aren't part of Year in Books, and reaching the last slide doesn't count as finishing a book. Charts show as a labelled box. Text in fonts your phone doesn't have uses a similar font.
+
 ## Discover free books
 
 Open the Library, then tap the **globe**.

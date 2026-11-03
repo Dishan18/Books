@@ -82,8 +82,8 @@ object WidgetData {
     private suspend fun currentReading(context: Context): WidgetReading? {
         val app = context.app
         val db = app.database
-        // Same "continue reading" rule as the library: opened, and not finished.
-        val book = db.books().getAll().filter { it.lastOpenedAt != null && it.progress < 0.995f }.maxByOrNull { it.lastOpenedAt!! }
+        // Same "continue reading" rule as the library (opened, not finished), for books only: never spreadsheets or slides.
+        val book = db.books().getAll().filter { it.format.isBook && it.lastOpenedAt != null && it.progress < 0.995f }.maxByOrNull { it.lastOpenedAt!! }
         val manga = db.manga().observeHistory(1).first().firstOrNull()
         if (book == null && manga == null) return null
 

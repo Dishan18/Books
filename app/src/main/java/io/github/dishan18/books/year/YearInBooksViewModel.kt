@@ -60,6 +60,7 @@ class YearInBooksViewModel(private val app: BooksApp) : ViewModel() {
                 when (kind) {
                     ReadingKind.BOOK -> books[id]?.subjectList.orEmpty()
                     ReadingKind.MANGA -> series(id)?.genreList.orEmpty()
+                    ReadingKind.SLIDES -> emptyList()
                 }
             }
             val recap = withContext(Dispatchers.Default) {

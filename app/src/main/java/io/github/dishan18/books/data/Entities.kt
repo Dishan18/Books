@@ -6,7 +6,17 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-enum class BookFormat { PDF, EPUB }
+/**
+ * New formats go at the end and existing names never change: the database stores the name. Excel
+ * and PowerPoint files open from other apps ("Open with"); spreadsheets are only looked at, not
+ * read, so they never count as reading.
+ */
+enum class BookFormat {
+    PDF, EPUB, XLSX, PPTX;
+
+    /** A book you read: shown in "Continue reading" and on the widget. */
+    val isBook get() = this == PDF || this == EPUB
+}
 
 @Entity(tableName = "books", indices = [Index(value = ["sourceId", "sourceKey"])])
 data class Book(

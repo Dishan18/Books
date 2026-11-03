@@ -5,7 +5,11 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-enum class ReadingKind { BOOK, MANGA }
+/**
+ * Stored by name: new kinds go at the end. Slides count toward streaks and reading time like a
+ * book, but are kept apart so Year in Books can leave them out.
+ */
+enum class ReadingKind { BOOK, MANGA, SLIDES }
 
 /** One stretch of reading in one book or manga series. */
 @Entity(tableName = "reading_sessions", indices = [Index("day"), Index(value = ["kind", "itemId"])])

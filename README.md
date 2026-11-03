@@ -10,6 +10,7 @@ Built with Kotlin and Jetpack Compose. EPUB rendering by the [Readium Kotlin too
 
 - **Library**: a grid of covers, newest-read first, with a "Continue reading" card. Covers are taken from the EPUB or from page 1 of the PDF; books without one get a generated cover.
 - **Import**: tap **Add books** to pick several PDFs and EPUBs, or use *Open with → Books* / *Share → Books* from Files, Drive or Gmail. Files are copied into the app, so deleting the original doesn't remove the book.
+- **Excel and PowerPoint**: open `.xlsx` and `.pptx` files from *Open with → Books*. Spreadsheets get a zoomable sheet view and never count as reading; slides read like PDF pages and count toward your streak (not Year in Books).
 - **PDF reader**: swipe or tap the left/right edges to turn pages. Pinch to zoom; pages are re-rendered sharper as you zoom in.
 - **EPUB reader**: reflowable text with adjustable size, a table of contents, and the same tap and swipe navigation.
 - **Light, Sepia and Dark** reading themes, plus **Midnight**, **Pink**, **Forest** and **True black** unlocked by reading. In dark themes PDF pages are recoloured to light text on the theme's background.

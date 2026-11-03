@@ -30,8 +30,9 @@ android {
     }
 
     sourceSets {
-        // Instrumented migration tests read the exported Room schemas.
+        // Instrumented migration tests read the exported Room schemas; Office tests read the same files as unit tests.
         getByName("androidTest").assets.directories.add("$projectDir/schemas")
+        getByName("androidTest").assets.directories.add("$projectDir/src/test/resources")
     }
 
     // One fixed key for every build, so APKs from your PC and from GitHub install over each other

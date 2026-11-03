@@ -16,13 +16,13 @@ import java.io.File
  * Renders PDF pages to bitmaps off the main thread. [PdfRenderer] can only work on one page at a
  * time, so every call goes through a single-threaded dispatcher.
  */
-class PdfDocument(file: File) {
+class PdfDocument(file: File) : PageDocument {
     private val dispatcher = Dispatchers.IO.limitedParallelism(1)
     private val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     private val renderer = PdfRenderer(fd)
     private var closed = false
 
-    val pageCount: Int = renderer.pageCount
+    override val pageCount: Int = renderer.pageCount
 
     /** Width / height of each page, filled in as pages are measured. */
     private val aspectRatios = FloatArray(pageCount)
@@ -31,19 +31,19 @@ class PdfDocument(file: File) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
-    fun cachedAspectRatio(index: Int): Float? = aspectRatios[index].takeIf { it > 0f }
+    override fun cachedAspectRatio(index: Int): Float? = aspectRatios[index].takeIf { it > 0f }
 
-    suspend fun aspectRatio(index: Int): Float = cachedAspectRatio(index) ?: withContext(dispatcher) {
+    override suspend fun aspectRatio(index: Int): Float = cachedAspectRatio(index) ?: withContext(dispatcher) {
         if (closed) return@withContext 1f
         cachedAspectRatio(index) ?: renderer.openPage(index).use { page ->
             (page.width.toFloat() / page.height).also { aspectRatios[index] = it }
         }
     }
 
-    fun cached(index: Int, width: Int): Bitmap? = cache.get(key(index, width))
+    override fun cached(index: Int, width: Int): Bitmap? = cache.get(key(index, width))
 
     /** Renders page [index] at [width] pixels wide. */
-    suspend fun render(index: Int, width: Int): Bitmap? {
+    override suspend fun render(index: Int, width: Int): Bitmap? {
         cached(index, width)?.let { return it }
         return withContext(dispatcher) {
             if (closed) return@withContext null
@@ -64,7 +64,7 @@ class PdfDocument(file: File) {
      * drawn [pageWidth] pixels wide and its top-left corner at ([left], [top]). Areas outside the
      * page stay white, which the theme filters turn into the reader background.
      */
-    suspend fun renderRegion(index: Int, width: Int, height: Int, left: Float, top: Float, pageWidth: Float): Bitmap? =
+    override suspend fun renderRegion(index: Int, width: Int, height: Int, left: Float, top: Float, pageWidth: Float): Bitmap? =
         withContext(dispatcher) {
             if (closed) return@withContext null
             renderer.openPage(index).use { page ->
@@ -81,11 +81,11 @@ class PdfDocument(file: File) {
         }
 
     /** While the reader is hidden keep only the most recent pages; in the background, none. */
-    fun trim(background: Boolean) {
+    override fun trim(background: Boolean) {
         if (background) cache.evictAll() else cache.trimToSize(cache.maxSize() / 4)
     }
 
-    fun close() {
+    override fun close() {
         // Wait for any render in flight before closing the renderer underneath it.
         CoroutineScope(dispatcher).launch {
             closed = true

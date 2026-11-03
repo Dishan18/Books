@@ -131,12 +131,14 @@ class PdfReaderActivity : ComponentActivity() {
 
 private enum class PdfSheet { Settings, Bookmarks }
 
+/** The PDF reader; with [slides] it shows a presentation's slides in their own colours. */
 @Composable
-private fun PdfReaderScreen(
+internal fun PdfReaderScreen(
     viewModel: PdfReaderViewModel,
     settingsStore: ReaderSettingsStore,
     onClose: () -> Unit,
     onWindowChange: (ReaderTheme, Boolean) -> Unit,
+    slides: Boolean = false,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by settingsStore.settings.collectAsStateWithLifecycle()
@@ -154,7 +156,7 @@ private fun PdfReaderScreen(
                 TextButton(onClick = onClose) { Text("Back to library") }
             }
             is PdfReaderViewModel.State.Ready ->
-                PdfReader(s, viewModel, settingsStore, theme, settings.pageDirection, onClose, onWindowChange)
+                PdfReader(s, viewModel, settingsStore, theme, settings.pageDirection, onClose, onWindowChange, slides)
         }
         RewardOverlay()
     }
@@ -169,8 +171,10 @@ private fun PdfReader(
     pageDirection: PageDirection,
     onClose: () -> Unit,
     onWindowChange: (ReaderTheme, Boolean) -> Unit,
+    slides: Boolean,
 ) {
     val document = ready.document
+    val unit = if (slides) "Slide" else "Page"
     val pageCount = document.pageCount
     val pagerState = rememberPagerState(initialPage = ready.initialPage) { pageCount }
     val scope = rememberCoroutineScope()
@@ -238,6 +242,9 @@ private fun PdfReader(
                 theme = theme,
                 isCurrent = page == pagerState.currentPage,
                 onZoomChange = { if (page == pagerState.currentPage) zoomed = it },
+                unit = unit,
+                // Slides keep their own colours; the theme only colours the space around them.
+                recolor = !slides,
             )
         }
         if (vertical) {
@@ -269,10 +276,10 @@ private fun PdfReader(
             visible = chromeVisible,
             theme = theme,
             title = ready.book.title,
-            progressLabel = "Page ${current + 1} of $pageCount",
+            progressLabel = "$unit ${current + 1} of $pageCount",
             pageCount = pageCount,
             currentPage = current,
-            previewLabel = { "Page ${it + 1} of $pageCount" },
+            previewLabel = { "$unit ${it + 1} of $pageCount" },
             onSeek = { scope.launch { pagerState.scrollToPage(it) } },
             bookmarked = bookmarks.any { it.location == current.toString() },
             onToggleBookmark = { viewModel.toggleBookmark(current, pageCount) },
@@ -374,11 +381,13 @@ private const val MAX_ZOOM = 5f
 
 @Composable
 private fun PdfPage(
-    document: PdfDocument,
+    document: PageDocument,
     index: Int,
     theme: ReaderTheme,
     isCurrent: Boolean,
     onZoomChange: (Boolean) -> Unit,
+    unit: String,
+    recolor: Boolean,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val boxWidth = constraints.maxWidth.toFloat()
@@ -513,9 +522,9 @@ private fun PdfPage(
                 if (image != null) {
                     Image(
                         bitmap = image,
-                        contentDescription = "Page ${index + 1}",
+                        contentDescription = "$unit ${index + 1}",
                         contentScale = ContentScale.FillBounds,
-                        colorFilter = pageFilter(theme),
+                        colorFilter = if (recolor) pageFilter(theme) else null,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -528,7 +537,7 @@ private fun PdfPage(
                     bitmap = region.bitmap,
                     contentDescription = null,
                     contentScale = ContentScale.FillBounds,
-                    colorFilter = pageFilter(theme),
+                    colorFilter = if (recolor) pageFilter(theme) else null,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

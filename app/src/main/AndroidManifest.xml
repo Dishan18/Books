@@ -32,6 +32,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/pdf" />
                 <data android:mimeType="application/epub+zip" />
+                <!-- Excel and PowerPoint (current formats only; old .xls and .ppt aren't supported). -->
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/vnd.ms-excel.sheet.macroenabled.12" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.slideshow" />
+                <data android:mimeType="application/vnd.ms-powerpoint.presentation.macroenabled.12" />
             </intent-filter>
         </activity>
 
@@ -116,6 +122,17 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:exported="false"
             android:theme="@style/Theme.Books.Reader" />
+
+        <activity
+            android:name=".office.slides.SlidesReaderActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:exported="false"
+            android:theme="@style/Theme.Books.Reader" />
+
+        <activity
+            android:name=".office.sheet.SheetViewerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:exported="false" />
 
         <activity
             android:name=".year.YearInBooksActivity"

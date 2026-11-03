@@ -85,6 +85,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.dishan18.books.data.Book
+import io.github.dishan18.books.data.BookFormat
 import io.github.dishan18.books.ui.BookCover
 import io.github.dishan18.books.ui.PressableBox
 import kotlinx.coroutines.launch
@@ -190,8 +191,9 @@ private fun LibraryGrid(
     onOpen: (Book, Rect) -> Unit,
     onLongPress: (Book) -> Unit,
 ) {
+    // Spreadsheets are only looked at, so they never sit in "Continue reading".
     val current = books
-        .filter { it.lastOpenedAt != null && it.progress < 0.995f }
+        .filter { it.format != BookFormat.XLSX && it.lastOpenedAt != null && it.progress < 0.995f }
         .maxByOrNull { it.lastOpenedAt!! }
 
     LazyVerticalGrid(
@@ -262,6 +264,7 @@ private fun BookTile(book: Book, onOpen: (Rect) -> Unit, onLongPress: () -> Unit
 }
 
 private fun statusOf(book: Book): String {
+    if (book.format == BookFormat.XLSX) return "Spreadsheet · XLSX"
     val progress = when {
         book.progress >= 0.995f -> "Finished"
         book.lastOpenedAt == null -> "New"

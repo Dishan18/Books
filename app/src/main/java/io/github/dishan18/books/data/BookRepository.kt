@@ -12,6 +12,9 @@ import android.util.Size
 import androidx.core.content.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import io.github.dishan18.books.office.OfficeCovers
+import io.github.dishan18.books.office.OfficeFiles
+import io.github.dishan18.books.office.OfficePackage
 import io.github.dishan18.books.widget.ReadingWidget
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.publication.services.coverFitting
@@ -65,7 +68,7 @@ class BookRepository(
     suspend fun import(uri: Uri): Result<Book> = withContext(Dispatchers.IO) {
         val displayName = displayNameOf(uri)
         val format = formatOf(uri, displayName)
-            ?: return@withContext Result.failure(IllegalArgumentException("$displayName isn't a PDF or EPUB"))
+            ?: return@withContext Result.failure(IllegalArgumentException("$displayName isn't a PDF, EPUB, Excel or PowerPoint file"))
 
         val id = UUID.randomUUID().toString()
         val file = File(booksDir, "$id.${format.name.lowercase()}")
@@ -77,6 +80,7 @@ class BookRepository(
             val book = when (format) {
                 BookFormat.PDF -> importPdf(id, file, fallbackTitle)
                 BookFormat.EPUB -> importEpub(id, file, fallbackTitle)
+                BookFormat.XLSX, BookFormat.PPTX -> importOffice(id, file, format, fallbackTitle)
             }
             db.books().insert(book)
             Result.success(book)
@@ -116,6 +120,7 @@ class BookRepository(
             var book = when (format) {
                 BookFormat.PDF -> importPdf(id, target, info.title)
                 BookFormat.EPUB -> importEpub(id, target, info.title)
+                BookFormat.XLSX, BookFormat.PPTX -> importOffice(id, target, format, info.title)
             }
             if (!book.hasCover && info.coverUrl != null) {
                 val bytes = runCatching { fetchCover(info.coverUrl) }.getOrNull()
@@ -182,6 +187,25 @@ class BookRepository(
         }
     }
 
+    /**
+     * Excel and PowerPoint files: checks the file really is one, then takes the title and author
+     * from its properties and draws a cover from its first sheet or slide.
+     */
+    private fun importOffice(id: String, file: File, format: BookFormat, fallbackTitle: String): Book {
+        OfficeFiles.verify(file, format)
+        val (title, author) = OfficePackage(file).use(OfficeFiles::properties)
+        val cover = runCatching { OfficeCovers.render(file, format, COVER_WIDTH) }.getOrNull()
+        return Book(
+            id = id,
+            title = title ?: fallbackTitle,
+            author = author,
+            format = format,
+            fileName = file.name,
+            hasCover = cover != null && saveCover(id, cover),
+            addedAt = System.currentTimeMillis(),
+        )
+    }
+
     private fun subjectsOf(publication: Publication): String =
         publication.metadata.subjects.map { it.name.trim() }.filter { it.isNotEmpty() }.distinct().take(12).joinToString("\n")
 
@@ -219,10 +243,11 @@ class BookRepository(
 
     private fun formatOf(uri: Uri, displayName: String): BookFormat? {
         val mime = context.contentResolver.getType(uri)
+        val extension = displayName.substringAfterLast('.', "").lowercase()
         return when {
-            mime == "application/pdf" || displayName.endsWith(".pdf", ignoreCase = true) -> BookFormat.PDF
-            mime == "application/epub+zip" || displayName.endsWith(".epub", ignoreCase = true) -> BookFormat.EPUB
-            else -> null
+            mime == "application/pdf" || extension == "pdf" -> BookFormat.PDF
+            mime == "application/epub+zip" || extension == "epub" -> BookFormat.EPUB
+            else -> mime?.lowercase()?.let(OfficeFiles.mimeTypes::get) ?: OfficeFiles.extensions[extension]
         }
     }
 

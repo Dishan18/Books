@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.dishan18.books.data.Book
 import io.github.dishan18.books.data.BookRepository
 import io.github.dishan18.books.data.Bookmark
+import io.github.dishan18.books.office.slides.SlideDocument
 import io.github.dishan18.books.rewards.RewardsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,15 +15,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Pages of a PDF, or (with [slides]) of a PowerPoint presentation, which reads the same way except
+ * that reaching the last slide doesn't count as finishing a book.
+ */
 class PdfReaderViewModel(
     private val bookId: String,
     private val repository: BookRepository,
     private val rewards: RewardsRepository,
+    private val slides: Boolean = false,
 ) : ViewModel() {
 
     sealed interface State {
         data object Loading : State
-        data class Ready(val book: Book, val document: PdfDocument, val initialPage: Int) : State
+        data class Ready(val book: Book, val document: PageDocument, val initialPage: Int) : State
         data class Failed(val message: String) : State
     }
 
@@ -40,11 +46,14 @@ class PdfReaderViewModel(
                 return@launch
             }
             _state.value = try {
-                val document = withContext(Dispatchers.IO) { PdfDocument(repository.fileOf(book)) }
+                val document = withContext(Dispatchers.IO) {
+                    val file = repository.fileOf(book)
+                    if (slides) SlideDocument.open(file) else PdfDocument(file)
+                }
                 val page = book.location?.toIntOrNull()?.coerceIn(0, (document.pageCount - 1).coerceAtLeast(0)) ?: 0
                 State.Ready(book, document, page)
             } catch (e: Exception) {
-                State.Failed("Couldn't open this PDF. ${e.message.orEmpty()}")
+                State.Failed((if (slides) "Couldn't open these slides. " else "Couldn't open this PDF. ") + e.message.orEmpty())
             }
             repository.markOpened(bookId)
         }
@@ -63,7 +72,7 @@ class PdfReaderViewModel(
         // Turning onto the last page finishes the book (reopening one already there doesn't).
         val opened = firstSettle
         firstSettle = false
-        if (!opened && pageCount > 0 && page == pageCount - 1) {
+        if (!slides && !opened && pageCount > 0 && page == pageCount - 1) {
             (state.value as? State.Ready)?.let { rewards.onBookFinished(bookId, it.book.title, pageCount) }
         }
     }
@@ -78,7 +87,7 @@ class PdfReaderViewModel(
                     Bookmark(
                         bookId = bookId,
                         location = page.toString(),
-                        label = "Page ${page + 1}",
+                        label = "${if (slides) "Slide" else "Page"} ${page + 1}",
                         progress = progressOf(page, pageCount),
                         createdAt = System.currentTimeMillis(),
                     ),

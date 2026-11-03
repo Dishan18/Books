@@ -50,6 +50,33 @@ class YearRecapTest {
     }
 
     @Test
+    fun slidesKeepTheStreakButStayOutOfTheRecap() {
+        val days = listOf(
+            // 10 minutes of a book and 5 of slides; then a day of slides alone that met the goal.
+            ReadingDay(day(6, 1), 900, goalMet = true, pages = 30),
+            ReadingDay(day(6, 2), 400, goalMet = true, pages = 12),
+        )
+        val sessions = listOf(
+            session(ReadingKind.BOOK, "b1", "A Book", day(6, 1), 9, 600).copy(pages = 20),
+            session(ReadingKind.SLIDES, "d1", "Lecture Deck", day(6, 1), 22, 300).copy(pages = 10),
+            session(ReadingKind.SLIDES, "d1", "Lecture Deck", day(6, 2), 22, 400).copy(pages = 12),
+        )
+        val recap = YearRecaps.build(2026, days, sessions, emptyList(), day(1, 1, 2025), day(1, 1, 2025), { _, _ -> listOf("Slides genre") }, zone)
+
+        assertEquals(600L, recap.totalSeconds)
+        assertEquals(20, recap.pagesTurned)
+        assertEquals("A Book", recap.topBook?.title)
+        assertEquals(1, recap.daysRead)
+        // The day of slides alone really did keep the streak going.
+        assertEquals(2, recap.goalDays)
+        assertEquals(2, recap.longestStreak)
+        assertEquals(10, recap.monthMinutes[5])
+        assertEquals(LocalDate.of(2026, 6, 1) to 600L, recap.busiestDay)
+        assertEquals(TimeOfDay.MORNING, recap.timeOfDay)
+        assertEquals(1f, recap.timeOfDayShare)
+    }
+
+    @Test
     fun frozenDaysKeepAStreakWithoutAddingToIt() {
         val days = listOf(
             ReadingDay(day(5, 1), 400, goalMet = true),

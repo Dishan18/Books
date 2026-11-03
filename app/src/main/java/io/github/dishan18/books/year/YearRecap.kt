@@ -71,8 +71,19 @@ object YearRecaps {
         zone: ZoneId = ZoneId.systemDefault(),
     ): YearRecap {
         val range = range(year)
-        val inYear = days.filter { it.day in range }
-        val yearSessions = sessions.filter { it.day in range }
+        val recorded = days.filter { it.day in range }
+        // Slides count toward streaks but aren't part of the recap: their time and slides turned come off each
+        // day's totals, and their sessions aren't favourites, genres or times of day. Goal days and streaks stay
+        // as they were, since those days really did keep the streak going.
+        val slideSessions = sessions.filter { it.kind == ReadingKind.SLIDES && it.day in range }
+        val slideSeconds = slideSessions.groupBy { it.day }.mapValues { (_, list) -> list.sumOf { it.activeSeconds } }
+        val slidePages = slideSessions.groupBy { it.day }.mapValues { (_, list) -> list.sumOf { it.pages } }
+        val inYear = recorded.map { d ->
+            val seconds = slideSeconds[d.day] ?: 0L
+            val pages = slidePages[d.day] ?: 0
+            if (seconds == 0L && pages == 0) d else d.copy(activeSeconds = (d.activeSeconds - seconds).coerceAtLeast(0), pages = (d.pages - pages).coerceAtLeast(0))
+        }
+        val yearSessions = sessions.filter { it.day in range && it.kind != ReadingKind.SLIDES }
         val yearFinished = finished.filter { it.day in range }
 
         val items = yearSessions
@@ -104,8 +115,8 @@ object YearRecaps {
             countingSince = firstRecordedDay?.takeIf { it in range && it > first }?.let(LocalDate::ofEpochDay),
             totalSeconds = inYear.sumOf { it.activeSeconds },
             daysRead = inYear.count { it.activeSeconds > 0 },
-            goalDays = inYear.count { it.goalMet },
-            longestStreak = longestStreak(inYear.associateBy { it.day }, range),
+            goalDays = recorded.count { it.goalMet },
+            longestStreak = longestStreak(recorded.associateBy { it.day }, range),
             booksFinished = yearFinished.filter { it.kind == FinishKind.BOOK }.map { FinishedBook(it.itemId, it.title, it.pages, it.finishedAt) },
             chaptersRead = yearFinished.count { it.kind == FinishKind.CHAPTER },
             seriesCompleted = yearFinished.count { it.kind == FinishKind.SERIES },

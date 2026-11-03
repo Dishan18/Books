@@ -198,6 +198,8 @@ class BookDownloadWorker(context: Context, params: WorkerParameters) : Coroutine
         return when (format) {
             BookFormat.EPUB -> head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()
             BookFormat.PDF -> String(head, 0, 4, Charsets.US_ASCII) == "%PDF"
+            // Catalogs only offer PDFs and EPUBs.
+            BookFormat.XLSX, BookFormat.PPTX -> false
         }
     }
 
